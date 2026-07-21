@@ -9,27 +9,27 @@ static func get_unit_spawns() -> Array[UnitSpawnData]:
 	return [
 		UnitSpawnData.new(
 			BattleEnums.Team.PLAYER,
-			Vector2i(1, 1),
+			Vector2i(10, 10),
 			_make_stats("Scout", 8, 5, 5, 75, 22, 90),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.PLAYER,
-			Vector2i(2, 1),
+			Vector2i(9, 10),
 			_make_stats("Heavy", 4, 3, 6, 70, 32, 120),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
-			Vector2i(10, 10),
+			Vector2i(1, 1),
 			_make_stats("Raider", 7, 4, 5, 72, 20, 85),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
-			Vector2i(9, 10),
+			Vector2i(2, 1),
 			_make_stats("Guard", 5, 3, 4, 68, 24, 100),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
-			Vector2i(10, 9),
+			Vector2i(1, 2),
 			_make_stats("Sniper", 3, 3, 7, 80, 28, 75),
 		),
 	]

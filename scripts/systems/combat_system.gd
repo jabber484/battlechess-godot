@@ -73,9 +73,9 @@ func resolve_attack(attacker: Unit, defender: Unit) -> Dictionary:
 		if defender.is_dead():
 			grid_system.clear_occupant(defender.grid_pos)
 			unit_killed.emit(defender)
+	attack_resolved.emit(attacker, defender, hit, int(result["damage"]), chance)
 	if turn_manager:
 		turn_manager.notify_acted(attacker)
-	attack_resolved.emit(attacker, defender, hit, int(result["damage"]), chance)
 	return result
 
 
