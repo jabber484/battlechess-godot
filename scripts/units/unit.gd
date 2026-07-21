@@ -144,6 +144,11 @@ func _build_damage_context(amount: int, attacker: Unit) -> RefCounted:
 	return ctx
 
 
+func show_miss_float() -> void:
+	if _hud:
+		_hud.show_miss()
+
+
 func set_grid_pos(pos: Vector2i, update_visual: bool = true) -> void:
 	grid_pos = pos
 	if update_visual:

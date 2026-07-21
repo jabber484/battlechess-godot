@@ -4,6 +4,7 @@ extends Node3D
 const BattleSpawnerScript := preload("res://scripts/battle/battle_spawner.gd")
 const DefaultBattleSetupScript := preload("res://scripts/data/default_battle_setup.gd")
 const MOVE_TILE_DURATION := 0.28
+const ATTACK_CAMERA_DELAY := 0.5
 const ATTACK_FOCUS_DURATION := 1.0
 
 @onready var grid_system: GridSystem = $Systems/GridSystem
@@ -110,6 +111,8 @@ func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int,
 		msg += "MISS"
 	battle_ui.set_status(msg)
 	battle_ui.append_log(msg, _log_color_for(attacker))
+	if not hit:
+		defender.show_miss_float()
 	battle_ui.set_hit_chance("")
 	_pending_attack_target = null
 
@@ -208,7 +211,9 @@ func _execute_attack(attacker: Unit, defender: Unit) -> void:
 		func() -> void:
 			camera_rig.focus_on(GridMath.grid_to_world(defender.grid_pos))
 			await get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
-			combat_system.commit_attack(attacker, defender),
+			combat_system.commit_attack(attacker, defender)
+			await get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
+			camera_rig.focus_on(GridMath.grid_to_world(attacker.grid_pos)),
 		func() -> void:
 			turn_manager.notify_acted(attacker),
 		[attacker, defender],

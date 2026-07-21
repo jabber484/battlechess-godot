@@ -33,6 +33,13 @@ func show_damage(amount: int) -> void:
 	floater.play(amount)
 
 
+func show_miss() -> void:
+	var floater: DamageFloat = DamageFloatScene.instantiate()
+	add_child(floater)
+	floater.position = Vector3(0, 0.25, 0)
+	floater.play_miss()
+
+
 func _on_hp_changed(_unit_ref: Unit, current_hp: int, max_hp: int) -> void:
 	_refresh_hp(current_hp, max_hp)
 
