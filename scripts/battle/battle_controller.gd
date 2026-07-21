@@ -1,6 +1,9 @@
 class_name BattleController
 extends Node3D
 
+const BattleSpawnerScript := preload("res://scripts/battle/battle_spawner.gd")
+const DefaultBattleSetupScript := preload("res://scripts/data/default_battle_setup.gd")
+
 @onready var grid_system: GridSystem = $Systems/GridSystem
 @onready var pathfinding: PathfindingSystem = $Systems/PathfindingSystem
 @onready var turn_manager: TurnManager = $Systems/TurnManager
@@ -12,8 +15,6 @@ extends Node3D
 @onready var camera_rig: CameraRig = $World/CameraRig
 @onready var battle_ui: BattleUI = $UI
 
-const UNIT_SCENE := preload("res://scenes/unit/Unit.tscn")
-
 var _units: Array[Unit] = []
 var _moving: bool = false
 var _pending_attack_target: Unit = null
@@ -21,6 +22,21 @@ var _pending_attack_target: Unit = null
 
 func _ready() -> void:
 	randomize()
+	_connect_signals()
+	_units = BattleSpawnerScript.spawn_units(
+		DefaultBattleSetupScript.get_unit_spawns(),
+		units_root,
+		grid_system,
+	)
+	for unit in _units:
+		unit.hp_changed.connect(_on_unit_hp_changed)
+	battle_state.register_units(_units)
+	turn_manager.register_units(_units)
+	turn_manager.start_battle()
+	battle_ui.append_log("Battle started", Color(0.7, 0.9, 1.0))
+
+
+func _connect_signals() -> void:
 	ai_system.set_move_executor(_execute_move)
 	grid_view.tile_picked.connect(_on_tile_picked)
 	turn_manager.round_started.connect(_on_round_started)
@@ -31,10 +47,6 @@ func _ready() -> void:
 	combat_system.attack_resolved.connect(_on_attack_resolved)
 	battle_state.battle_ended.connect(_on_battle_ended)
 	battle_ui.end_turn_pressed.connect(_on_end_turn_pressed)
-	_spawn_units()
-	battle_state.register_units(_units)
-	turn_manager.register_units(_units)
-	turn_manager.start_battle()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -42,26 +54,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_end_turn_pressed()
 
 
-func _spawn_units() -> void:
-	var spawns := [
-		{"team": BattleEnums.Team.PLAYER, "pos": Vector2i(1, 1), "stats": {"display_name": "Scout", "speed": 8, "move_range": 5, "attack_range": 5, "accuracy": 75, "damage": 22, "max_hp": 90}},
-		{"team": BattleEnums.Team.PLAYER, "pos": Vector2i(2, 1), "stats": {"display_name": "Heavy", "speed": 4, "move_range": 3, "attack_range": 6, "accuracy": 70, "damage": 32, "max_hp": 120}},
-		{"team": BattleEnums.Team.ENEMY, "pos": Vector2i(10, 10), "stats": {"display_name": "Raider", "speed": 7, "move_range": 4, "attack_range": 5, "accuracy": 72, "damage": 20, "max_hp": 85}},
-		{"team": BattleEnums.Team.ENEMY, "pos": Vector2i(9, 10), "stats": {"display_name": "Guard", "speed": 5, "move_range": 3, "attack_range": 4, "accuracy": 68, "damage": 24, "max_hp": 100}},
-		{"team": BattleEnums.Team.ENEMY, "pos": Vector2i(10, 9), "stats": {"display_name": "Sniper", "speed": 3, "move_range": 3, "attack_range": 7, "accuracy": 80, "damage": 28, "max_hp": 75}},
-	]
-	for entry in spawns:
-		var unit: Unit = UNIT_SCENE.instantiate()
-		units_root.add_child(unit)
-		unit.setup(entry["team"], entry["pos"], entry["stats"])
-		grid_system.register_unit(unit)
-		unit.hp_changed.connect(_on_unit_hp_changed)
-		_units.append(unit)
-
-
 func _on_round_started(round_number: int) -> void:
 	battle_ui.set_round(round_number)
 	battle_ui.set_status("Round %d" % round_number)
+	battle_ui.append_log("--- Round %d ---" % round_number, Color(0.7, 0.9, 1.0))
 
 
 func _on_turn_started(unit: Unit) -> void:
@@ -71,6 +67,8 @@ func _on_turn_started(unit: Unit) -> void:
 	battle_ui.set_end_turn_enabled(unit.is_player())
 	camera_rig.focus_on(GridMath.grid_to_world(unit.grid_pos))
 	_refresh_highlights()
+	var team_tag := "Player" if unit.is_player() else "Enemy"
+	battle_ui.append_log("[%s] %s's turn" % [team_tag, unit.display_name], _log_color_for(unit))
 	if unit.is_enemy():
 		battle_ui.set_status("Enemy turn: %s" % unit.display_name)
 		ai_system.run_unit_turn(unit)
@@ -78,7 +76,9 @@ func _on_turn_started(unit: Unit) -> void:
 		battle_ui.set_status("Your turn: %s — click move or enemy" % unit.display_name)
 
 
-func _on_turn_ended(_unit: Unit) -> void:
+func _on_turn_ended(unit: Unit) -> void:
+	if unit:
+		battle_ui.append_log("%s ended turn" % unit.display_name, _log_color_for(unit))
 	grid_view.clear_highlights()
 	battle_ui.set_hit_chance("")
 	_pending_attack_target = null
@@ -106,6 +106,7 @@ func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int,
 	else:
 		msg += "MISS"
 	battle_ui.set_status(msg)
+	battle_ui.append_log(msg, _log_color_for(attacker))
 	battle_ui.set_hit_chance("")
 	_pending_attack_target = null
 	_refresh_highlights()
@@ -113,6 +114,11 @@ func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int,
 
 func _on_battle_ended(result: BattleEnums.BattleResult) -> void:
 	battle_ui.show_battle_result(result)
+	match result:
+		BattleEnums.BattleResult.VICTORY:
+			battle_ui.append_log("VICTORY!", Color(0.4, 1.0, 0.5))
+		BattleEnums.BattleResult.DEFEAT:
+			battle_ui.append_log("DEFEAT!", Color(1.0, 0.4, 0.4))
 	battle_ui.set_end_turn_enabled(false)
 	grid_view.clear_highlights()
 
@@ -172,6 +178,15 @@ func _execute_move(unit: Unit, to_pos: Vector2i) -> void:
 	grid_system.register_unit(unit)
 	unit.set_grid_pos(to_pos)
 	turn_manager.notify_moved(unit)
+	battle_ui.append_log(
+		"%s moves %s → %s (%d tiles)" % [
+			unit.display_name,
+			_fmt_grid_pos(from),
+			_fmt_grid_pos(to_pos),
+			path.size() - 1,
+		],
+		_log_color_for(unit),
+	)
 	turn_manager.set_busy(false)
 	_moving = false
 	_refresh_highlights()
@@ -195,3 +210,13 @@ func _refresh_highlights() -> void:
 		grid_view.show_reachable(pathfinding.get_reachable_tiles(active))
 	if turn_manager.can_act(active):
 		grid_view.show_attackable(combat_system.get_attackable_tiles(active, battle_state.get_living_enemies()))
+
+
+func _log_color_for(unit: Unit) -> Color:
+	if unit.is_player():
+		return Color(0.55, 0.78, 1.0)
+	return Color(1.0, 0.55, 0.55)
+
+
+func _fmt_grid_pos(pos: Vector2i) -> String:
+	return "(%d,%d)" % [pos.x, pos.y]

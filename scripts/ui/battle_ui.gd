@@ -10,12 +10,19 @@ signal end_turn_pressed
 @onready var hit_chance_label: Label = %HitChanceLabel
 @onready var status_label: Label = %StatusLabel
 @onready var end_turn_button: Button = %EndTurnButton
+@onready var log_label: RichTextLabel = %LogLabel
+@onready var log_scroll: ScrollContainer = %LogScroll
+
+const MAX_LOG_LINES := 50
+
+var _log_lines: PackedStringArray = PackedStringArray()
 
 
 func _ready() -> void:
 	end_turn_button.pressed.connect(func(): end_turn_pressed.emit())
 	hit_chance_label.text = ""
 	status_label.text = ""
+	log_label.text = ""
 
 
 func set_round(round_number: int) -> void:
@@ -64,6 +71,20 @@ func set_hit_chance(text: String) -> void:
 
 func set_status(text: String) -> void:
 	status_label.text = text
+
+
+func append_log(message: String, color: Color = Color(0.85, 0.85, 0.85)) -> void:
+	var hex := color.to_html(false)
+	_log_lines.append("[color=#%s]%s[/color]" % [hex, message])
+	while _log_lines.size() > MAX_LOG_LINES:
+		_log_lines.remove_at(0)
+	log_label.text = "\n".join(_log_lines)
+	call_deferred("_scroll_log_to_bottom")
+
+
+func _scroll_log_to_bottom() -> void:
+	var bar := log_scroll.get_v_scroll_bar()
+	log_scroll.scroll_vertical = int(bar.max_value)
 
 
 func set_end_turn_enabled(enabled: bool) -> void:
