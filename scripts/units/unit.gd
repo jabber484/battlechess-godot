@@ -1,8 +1,11 @@
 class_name Unit
 extends Node3D
 
+const _DamageContextRes = preload("res://scripts/data/damage_context.gd")
+
 signal died(unit: Unit)
 signal hp_changed(unit: Unit, current_hp: int, max_hp: int)
+signal incoming_damage(context)
 
 @export var team: BattleEnums.Team = BattleEnums.Team.PLAYER
 @export var display_name: String = "Unit"
@@ -101,13 +104,44 @@ func can_act_more() -> bool:
 	return actions_used < max_actions
 
 
-func take_damage(amount: int) -> void:
-	if is_dead() or death_processed:
+func emit_death() -> void:
+	if death_processed:
 		return
-	current_hp = maxi(0, current_hp - amount)
+	death_processed = true
+	died.emit(self)
+
+
+func take_damage(amount: int, attacker: Unit = null) -> int:
+	return receive_damage(amount, attacker)
+
+
+func receive_damage(amount: int, attacker: Unit = null) -> int:
+	if is_dead() or death_processed:
+		return 0
+	var ctx: RefCounted = _build_damage_context(amount, attacker)
+	modify_incoming_damage(ctx)
+	incoming_damage.emit(ctx)
+	var applied := maxi(0, ctx.final_damage)
+	if applied <= 0:
+		return 0
+	current_hp = maxi(0, current_hp - applied)
 	hp_changed.emit(self, current_hp, max_hp)
 	if _hud:
-		_hud.show_damage(amount)
+		_hud.show_damage(applied)
+	return applied
+
+
+func modify_incoming_damage(_context) -> void:
+	pass
+
+
+func _build_damage_context(amount: int, attacker: Unit) -> RefCounted:
+	var ctx: RefCounted = _DamageContextRes.new()
+	ctx.attacker = attacker
+	ctx.defender = self
+	ctx.raw_damage = amount
+	ctx.final_damage = amount
+	return ctx
 
 
 func set_grid_pos(pos: Vector2i, update_visual: bool = true) -> void:

@@ -25,10 +25,9 @@ func evaluate_deaths(units: Array[Unit]) -> void:
 
 
 func _process_death(unit: Unit) -> void:
-	unit.death_processed = true
+	unit.emit_death()
 	grid_system.clear_occupant(unit.grid_pos)
 	unit_killed.emit(unit)
-	unit.died.emit(unit)
 	await _present_death(unit)
 	unit.visible = false
 	turn_manager.process_unit_death(unit)

@@ -59,8 +59,8 @@ func commit_attack(attacker: Unit, defender: Unit) -> Dictionary:
 	var hit := roll <= chance
 	result["hit"] = hit
 	if hit:
-		defender.take_damage(attacker.damage)
-		result["damage"] = attacker.damage
+		var applied: int = defender.receive_damage(attacker.damage, attacker)
+		result["damage"] = applied
 	attack_resolved.emit(attacker, defender, hit, int(result["damage"]), chance)
 	return result
 
