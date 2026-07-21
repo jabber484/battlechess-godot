@@ -8,6 +8,8 @@ extends Resource
 @export var accuracy: int = 80
 @export var damage: int = 25
 @export var max_hp: int = 100
+@export var max_moves: int = 1
+@export var max_actions: int = 1
 
 
 func to_dict() -> Dictionary:
@@ -19,4 +21,6 @@ func to_dict() -> Dictionary:
 		"accuracy": accuracy,
 		"damage": damage,
 		"max_hp": max_hp,
+		"max_moves": max_moves,
+		"max_actions": max_actions,
 	}

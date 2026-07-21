@@ -60,8 +60,8 @@ func set_active_unit(unit: Unit) -> void:
 
 
 func _refresh_flags(unit: Unit) -> void:
-	var move_txt := "Moved" if unit.has_moved else "Move ready"
-	var act_txt := "Acted" if unit.has_acted else "Action ready"
+	var move_txt := "Move %d/%d" % [unit.moves_used, unit.max_moves]
+	var act_txt := "Action %d/%d" % [unit.actions_used, unit.max_actions]
 	flags_label.text = "%s | %s" % [move_txt, act_txt]
 
 

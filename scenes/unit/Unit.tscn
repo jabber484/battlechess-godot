@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/units/unit.gd" id="1_unit"]
+[ext_resource type="PackedScene" path="res://scenes/unit/UnitHUD.tscn" id="2_hud"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_unit"]
 radius = 0.28
@@ -11,3 +12,5 @@ script = ExtResource("1_unit")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 mesh = SubResource("CapsuleMesh_unit")
+
+[node name="UnitHUD" parent="." instance=ExtResource("2_hud")]

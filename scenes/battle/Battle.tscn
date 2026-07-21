@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/battle/battle_controller.gd" id="1_battle"]
 [ext_resource type="Script" path="res://scripts/systems/grid_system.gd" id="2_grid"]
@@ -10,6 +10,8 @@
 [ext_resource type="Script" path="res://scripts/systems/grid_view.gd" id="8_view"]
 [ext_resource type="Script" path="res://scripts/camera/camera_rig.gd" id="9_cam"]
 [ext_resource type="PackedScene" path="res://scenes/ui/BattleUI.tscn" id="10_ui"]
+[ext_resource type="Script" path="res://scripts/systems/death_system.gd" id="11_death"]
+[ext_resource type="Script" path="res://scripts/systems/action_runner.gd" id="12_action"]
 
 [sub_resource type="Environment" id="Environment_battle"]
 background_mode = 1
@@ -66,6 +68,17 @@ battle_state_path = NodePath("../BattleState")
 script = ExtResource("5_combat")
 grid_system_path = NodePath("../GridSystem")
 turn_manager_path = NodePath("../TurnManager")
+
+[node name="DeathSystem" type="Node" parent="Systems"]
+script = ExtResource("11_death")
+grid_system_path = NodePath("../GridSystem")
+turn_manager_path = NodePath("../TurnManager")
+
+[node name="ActionRunner" type="Node" parent="Systems"]
+script = ExtResource("12_action")
+turn_manager_path = NodePath("../TurnManager")
+battle_state_path = NodePath("../BattleState")
+death_system_path = NodePath("../DeathSystem")
 
 [node name="AISystem" type="Node" parent="Systems"]
 script = ExtResource("6_ai")

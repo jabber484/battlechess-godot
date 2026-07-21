@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/units/damage_float.gd" id="1_float"]
+
+[node name="DamageFloat" type="Node3D"]
+script = ExtResource("1_float")
+
+[node name="Label3D" type="Label3D" parent="."]
+billboard = 1
+modulate = Color(1, 0.4, 0.35, 1)
+text = "-0"
+font_size = 28
+outline_size = 6
+outline_modulate = Color(0.1, 0.05, 0.05, 1)
+horizontal_alignment = 1
+vertical_alignment = 1

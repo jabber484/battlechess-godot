@@ -2,7 +2,6 @@ class_name CombatSystem
 extends Node
 
 signal attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int, hit_chance: int)
-signal unit_killed(unit: Unit)
 
 @export var grid_system_path: NodePath
 @export var turn_manager_path: NodePath
@@ -21,15 +20,7 @@ func _ready() -> void:
 
 
 func can_attack(attacker: Unit, defender: Unit) -> bool:
-	if attacker == null or defender == null:
-		return false
-	if attacker.is_dead() or defender.is_dead():
-		return false
-	if attacker.team == defender.team:
-		return false
-	if turn_manager and not turn_manager.can_act(attacker):
-		return false
-	return GridMath.manhattan(attacker.grid_pos, defender.grid_pos) <= attacker.attack_range
+	return _validate_attack(attacker, defender, false)
 
 
 func get_attackable_units(attacker: Unit, units: Array[Unit]) -> Array[Unit]:
@@ -54,13 +45,13 @@ func compute_hit_chance(attacker: Unit, defender: Unit) -> int:
 	return clampi(attacker.accuracy - distance_penalty - cover_penalty, 5, 95)
 
 
-func resolve_attack(attacker: Unit, defender: Unit) -> Dictionary:
+func commit_attack(attacker: Unit, defender: Unit) -> Dictionary:
 	var result := {
 		"hit": false,
 		"damage": 0,
 		"hit_chance": 0,
 	}
-	if not can_attack(attacker, defender):
+	if not _validate_attack(attacker, defender, true):
 		return result
 	var chance := compute_hit_chance(attacker, defender)
 	result["hit_chance"] = chance
@@ -70,13 +61,24 @@ func resolve_attack(attacker: Unit, defender: Unit) -> Dictionary:
 	if hit:
 		defender.take_damage(attacker.damage)
 		result["damage"] = attacker.damage
-		if defender.is_dead():
-			grid_system.clear_occupant(defender.grid_pos)
-			unit_killed.emit(defender)
 	attack_resolved.emit(attacker, defender, hit, int(result["damage"]), chance)
-	if turn_manager:
-		turn_manager.notify_acted(attacker)
 	return result
+
+
+func _validate_attack(attacker: Unit, defender: Unit, for_commit: bool) -> bool:
+	if attacker == null or defender == null:
+		return false
+	if attacker.is_dead() or defender.is_dead():
+		return false
+	if attacker.team == defender.team:
+		return false
+	if turn_manager:
+		if for_commit:
+			if not turn_manager.owns_turn(attacker) or not attacker.can_act_more():
+				return false
+		elif not turn_manager.can_act(attacker):
+			return false
+	return GridMath.manhattan(attacker.grid_pos, defender.grid_pos) <= attacker.attack_range
 
 
 func _cover_penalty(grid_pos: Vector2i) -> int:

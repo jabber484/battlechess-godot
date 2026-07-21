@@ -14,6 +14,7 @@ var turn_manager: TurnManager
 var battle_state: BattleState
 
 var _mover: Callable
+var _attacker: Callable
 
 
 func _ready() -> void:
@@ -26,6 +27,10 @@ func _ready() -> void:
 
 func set_move_executor(mover: Callable) -> void:
 	_mover = mover
+
+
+func set_attack_executor(attacker: Callable) -> void:
+	_attacker = attacker
 
 
 func run_unit_turn(unit: Unit) -> void:
@@ -59,10 +64,6 @@ func run_unit_turn(unit: Unit) -> void:
 	if not turn_manager.owns_turn(unit):
 		return
 
-	await get_tree().create_timer(0.2).timeout
-	if not turn_manager.owns_turn(unit):
-		return
-
 	var targets := combat_system.get_attackable_units(unit, players)
 	if not targets.is_empty() and turn_manager.can_act(unit):
 		targets.sort_custom(func(a: Unit, b: Unit) -> bool:
@@ -72,12 +73,11 @@ func run_unit_turn(unit: Unit) -> void:
 				return ca > cb
 			return a.current_hp < b.current_hp
 		)
-		combat_system.resolve_attack(unit, targets[0])
-		await get_tree().create_timer(0.35).timeout
+		if _attacker.is_valid():
+			await _attacker.call(unit, targets[0])
 		if not turn_manager.owns_turn(unit):
 			return
 
-	# Auto-finish may have already advanced after move+shoot; only finish if still our turn.
 	turn_manager.finish_turn(unit)
 
 
@@ -110,7 +110,6 @@ func _score_tile(unit: Unit, tile: Vector2i, players: Array[Unit]) -> int:
 			pass
 	if can_shoot_from_here:
 		score += 25
-	# Slight preference to stay put if already good.
 	if tile == unit.grid_pos:
 		score += 2
 	return score

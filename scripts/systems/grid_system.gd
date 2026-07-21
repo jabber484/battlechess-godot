@@ -91,13 +91,13 @@ func clear_occupant(grid_pos: Vector2i) -> void:
 	occupancy_changed.emit(grid_pos)
 
 
-func move_occupant(from_pos: Vector2i, to_pos: Vector2i, unit: Unit) -> void:
+func move_occupant(from_pos: Vector2i, to_pos: Vector2i, unit: Unit, update_visual: bool = true) -> void:
 	clear_occupant(from_pos)
 	var tile := get_tile(to_pos)
 	if tile == null:
 		return
 	tile.occupant = unit
-	unit.set_grid_pos(to_pos)
+	unit.set_grid_pos(to_pos, update_visual)
 	occupancy_changed.emit(to_pos)
 
 

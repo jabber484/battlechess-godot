@@ -3,11 +3,14 @@ extends Node3D
 
 const BattleSpawnerScript := preload("res://scripts/battle/battle_spawner.gd")
 const DefaultBattleSetupScript := preload("res://scripts/data/default_battle_setup.gd")
+const MOVE_TILE_DURATION := 0.28
+const ATTACK_FOCUS_DURATION := 1.0
 
 @onready var grid_system: GridSystem = $Systems/GridSystem
 @onready var pathfinding: PathfindingSystem = $Systems/PathfindingSystem
 @onready var turn_manager: TurnManager = $Systems/TurnManager
 @onready var combat_system: CombatSystem = $Systems/CombatSystem
+@onready var action_runner: ActionRunner = $Systems/ActionRunner
 @onready var ai_system: AISystem = $Systems/AISystem
 @onready var battle_state: BattleState = $Systems/BattleState
 @onready var grid_view: GridView = $World/GridView
@@ -16,7 +19,6 @@ const DefaultBattleSetupScript := preload("res://scripts/data/default_battle_set
 @onready var battle_ui: BattleUI = $UI
 
 var _units: Array[Unit] = []
-var _moving: bool = false
 var _pending_attack_target: Unit = null
 
 
@@ -38,6 +40,7 @@ func _ready() -> void:
 
 func _connect_signals() -> void:
 	ai_system.set_move_executor(_execute_move)
+	ai_system.set_attack_executor(_execute_attack)
 	grid_view.tile_picked.connect(_on_tile_picked)
 	turn_manager.round_started.connect(_on_round_started)
 	turn_manager.turn_started.connect(_on_turn_started)
@@ -109,7 +112,6 @@ func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int,
 	battle_ui.append_log(msg, _log_color_for(attacker))
 	battle_ui.set_hit_chance("")
 	_pending_attack_target = null
-	_refresh_highlights()
 
 
 func _on_battle_ended(result: BattleEnums.BattleResult) -> void:
@@ -129,7 +131,7 @@ func _on_end_turn_pressed() -> void:
 
 
 func _on_tile_picked(grid_pos: Vector2i) -> void:
-	if battle_state.is_over() or _moving:
+	if battle_state.is_over() or turn_manager.is_busy():
 		return
 	var active := turn_manager.active_unit
 	if active == null or not active.is_player():
@@ -144,7 +146,6 @@ func _on_tile_picked(grid_pos: Vector2i) -> void:
 		_execute_move(active, grid_pos)
 		return
 
-	# Second click confirm if target already selected but clicked empty — clear.
 	_pending_attack_target = null
 	battle_ui.set_hit_chance("")
 
@@ -155,40 +156,63 @@ func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
 		return
 	var chance := combat_system.compute_hit_chance(attacker, defender)
 	if _pending_attack_target == defender:
-		combat_system.resolve_attack(attacker, defender)
+		_execute_attack(attacker, defender)
 	else:
 		_pending_attack_target = defender
+		camera_rig.focus_on(GridMath.grid_to_world(defender.grid_pos))
 		battle_ui.set_hit_chance("Hit chance: %d%% — click again to confirm" % chance)
 		battle_ui.set_status("Targeting %s" % defender.display_name)
 
 
 func _execute_move(unit: Unit, to_pos: Vector2i) -> void:
-	if _moving:
+	if turn_manager.is_busy():
 		return
 	var path := pathfinding.find_path(unit.grid_pos, to_pos, unit)
 	if path.size() < 2:
 		return
-	_moving = true
-	turn_manager.set_busy(true)
 	grid_view.clear_highlights()
 	var from := unit.grid_pos
-	# Clear occupancy at start; set at end to avoid blocking path mid-tween.
-	grid_system.clear_occupant(from)
-	await _tween_along_path(unit, path)
-	grid_system.register_unit(unit)
-	unit.set_grid_pos(to_pos)
-	turn_manager.notify_moved(unit)
-	battle_ui.append_log(
-		"%s moves %s → %s (%d tiles)" % [
-			unit.display_name,
-			_fmt_grid_pos(from),
-			_fmt_grid_pos(to_pos),
-			path.size() - 1,
-		],
-		_log_color_for(unit),
+	var tile_count := path.size() - 1
+	camera_rig.focus_on(GridMath.grid_to_world(to_pos))
+
+	await action_runner.run(
+		func() -> void:
+			grid_system.move_occupant(from, to_pos, unit, false),
+		func() -> void:
+			await _tween_along_path(unit, path),
+		func() -> void:
+			turn_manager.notify_moved(unit)
+			battle_ui.append_log(
+				"%s moves %s → %s (%d tiles)" % [
+					unit.display_name,
+					_fmt_grid_pos(from),
+					_fmt_grid_pos(to_pos),
+					tile_count,
+				],
+				_log_color_for(unit),
+			),
+		[unit],
 	)
-	turn_manager.set_busy(false)
-	_moving = false
+	_refresh_highlights()
+
+
+func _execute_attack(attacker: Unit, defender: Unit) -> void:
+	if turn_manager.is_busy():
+		return
+	if not combat_system.can_attack(attacker, defender):
+		return
+	grid_view.clear_highlights()
+
+	await action_runner.run(
+		Callable(),
+		func() -> void:
+			camera_rig.focus_on(GridMath.grid_to_world(defender.grid_pos))
+			await get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
+			combat_system.commit_attack(attacker, defender),
+		func() -> void:
+			turn_manager.notify_acted(attacker),
+		[attacker, defender],
+	)
 	_refresh_highlights()
 
 
@@ -196,9 +220,9 @@ func _tween_along_path(unit: Unit, path: Array[Vector2i]) -> void:
 	for i in range(1, path.size()):
 		var target_world := GridMath.grid_to_world(path[i], 0.5)
 		var tween := create_tween()
-		tween.tween_property(unit, "global_position", target_world, 0.12)
+		tween.tween_property(unit, "global_position", target_world, MOVE_TILE_DURATION)
 		await tween.finished
-	unit.grid_pos = path[path.size() - 1]
+	unit.set_grid_pos(path[path.size() - 1])
 
 
 func _refresh_highlights() -> void:

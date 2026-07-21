@@ -26,9 +26,6 @@ func _ready() -> void:
 
 func register_units(units: Array[Unit]) -> void:
 	_units = units.duplicate()
-	for unit in _units:
-		if not unit.died.is_connected(_on_unit_died):
-			unit.died.connect(_on_unit_died)
 
 
 func start_battle() -> void:
@@ -38,17 +35,17 @@ func start_battle() -> void:
 
 
 func can_move(unit: Unit) -> bool:
-	return phase == BattleEnums.TurnPhase.UNIT_TURN and unit == active_unit and not unit.has_moved and not _busy
+	return phase == BattleEnums.TurnPhase.UNIT_TURN and unit == active_unit and unit.can_move_more() and not _busy
 
 
 func can_act(unit: Unit) -> bool:
-	return phase == BattleEnums.TurnPhase.UNIT_TURN and unit == active_unit and not unit.has_acted and not _busy
+	return phase == BattleEnums.TurnPhase.UNIT_TURN and unit == active_unit and unit.can_act_more() and not _busy
 
 
 func notify_moved(unit: Unit) -> void:
 	if unit != active_unit:
 		return
-	unit.has_moved = true
+	unit.moves_used += 1
 	unit_flags_changed.emit(unit)
 	_try_auto_finish()
 
@@ -56,7 +53,7 @@ func notify_moved(unit: Unit) -> void:
 func notify_acted(unit: Unit) -> void:
 	if unit != active_unit:
 		return
-	unit.has_acted = true
+	unit.actions_used += 1
 	unit_flags_changed.emit(unit)
 	_try_auto_finish()
 
@@ -89,6 +86,26 @@ func owns_turn(unit: Unit) -> bool:
 
 func set_busy(busy: bool) -> void:
 	_busy = busy
+
+
+func is_busy() -> bool:
+	return _busy
+
+
+func handle_battle_over() -> void:
+	active_unit = null
+	_set_phase(BattleEnums.TurnPhase.BATTLE_OVER)
+
+
+func process_unit_death(unit: Unit) -> void:
+	var remaining: Array[Unit] = []
+	for u in turn_queue:
+		if u != unit and u.is_alive():
+			remaining.append(u)
+	turn_queue = remaining
+	queue_changed.emit(get_initiative_preview())
+	if active_unit == unit:
+		finish_turn(unit)
 
 
 func get_initiative_preview() -> Array[Unit]:
@@ -149,23 +166,8 @@ func _advance_queue() -> void:
 
 
 func _try_auto_finish() -> void:
-	if active_unit and active_unit.has_moved and active_unit.has_acted:
+	if active_unit and not active_unit.can_move_more() and not active_unit.can_act_more():
 		finish_turn()
-
-
-func _on_unit_died(unit: Unit) -> void:
-	var remaining: Array[Unit] = []
-	for u in turn_queue:
-		if u != unit and u.is_alive():
-			remaining.append(u)
-	turn_queue = remaining
-	queue_changed.emit(get_initiative_preview())
-	if battle_state and battle_state.check_end_conditions():
-		active_unit = null
-		_set_phase(BattleEnums.TurnPhase.BATTLE_OVER)
-		return
-	if active_unit == unit:
-		finish_turn(unit)
 
 
 func _set_phase(p: BattleEnums.TurnPhase) -> void:
