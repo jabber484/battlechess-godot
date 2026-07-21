@@ -1,0 +1,78 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/battle/battle_controller.gd" id="1_battle"]
+[ext_resource type="Script" path="res://scripts/systems/grid_system.gd" id="2_grid"]
+[ext_resource type="Script" path="res://scripts/systems/pathfinding_system.gd" id="3_path"]
+[ext_resource type="Script" path="res://scripts/systems/turn_manager.gd" id="4_turn"]
+[ext_resource type="Script" path="res://scripts/systems/combat_system.gd" id="5_combat"]
+[ext_resource type="Script" path="res://scripts/systems/ai_system.gd" id="6_ai"]
+[ext_resource type="Script" path="res://scripts/systems/battle_state.gd" id="7_state"]
+[ext_resource type="Script" path="res://scripts/systems/grid_view.gd" id="8_view"]
+[ext_resource type="Script" path="res://scripts/camera/camera_rig.gd" id="9_cam"]
+[ext_resource type="PackedScene" path="res://scenes/ui/BattleUI.tscn" id="10_ui"]
+
+[sub_resource type="Environment" id="Environment_battle"]
+background_mode = 1
+background_color = Color(0.12, 0.13, 0.16, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.7, 0.72, 0.78, 1)
+ambient_light_energy = 0.55
+
+[node name="Battle" type="Node3D"]
+script = ExtResource("1_battle")
+
+[node name="World" type="Node3D" parent="."]
+
+[node name="GridView" type="Node3D" parent="World"]
+script = ExtResource("8_view")
+grid_system_path = NodePath("../../Systems/GridSystem")
+camera_path = NodePath("../CameraRig")
+
+[node name="Units" type="Node3D" parent="World"]
+
+[node name="CameraRig" type="Node3D" parent="World"]
+script = ExtResource("9_cam")
+
+[node name="Camera3D" type="Camera3D" parent="World/CameraRig"]
+current = true
+fov = 50.0
+
+[node name="Lighting" type="Node3D" parent="World"]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="World/Lighting"]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 0, 10, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="World/Lighting"]
+environment = SubResource("Environment_battle")
+
+[node name="Systems" type="Node" parent="."]
+
+[node name="GridSystem" type="Node" parent="Systems"]
+script = ExtResource("2_grid")
+
+[node name="PathfindingSystem" type="Node" parent="Systems"]
+script = ExtResource("3_path")
+grid_system_path = NodePath("../GridSystem")
+
+[node name="BattleState" type="Node" parent="Systems"]
+script = ExtResource("7_state")
+
+[node name="TurnManager" type="Node" parent="Systems"]
+script = ExtResource("4_turn")
+battle_state_path = NodePath("../BattleState")
+
+[node name="CombatSystem" type="Node" parent="Systems"]
+script = ExtResource("5_combat")
+grid_system_path = NodePath("../GridSystem")
+turn_manager_path = NodePath("../TurnManager")
+
+[node name="AISystem" type="Node" parent="Systems"]
+script = ExtResource("6_ai")
+grid_system_path = NodePath("../GridSystem")
+pathfinding_path = NodePath("../PathfindingSystem")
+combat_system_path = NodePath("../CombatSystem")
+turn_manager_path = NodePath("../TurnManager")
+battle_state_path = NodePath("../BattleState")
+
+[node name="UI" parent="." instance=ExtResource("10_ui")]

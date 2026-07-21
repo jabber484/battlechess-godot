@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/units/unit.gd" id="1_unit"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_unit"]
+radius = 0.28
+height = 0.95
+
+[node name="Unit" type="Node3D"]
+script = ExtResource("1_unit")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_unit")
