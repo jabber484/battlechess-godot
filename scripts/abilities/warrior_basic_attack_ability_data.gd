@@ -9,6 +9,7 @@ func _init() -> void:
 	display_name = "WarriorBasicAttack"
 	category = BattleEnums.AbilityCategory.ACTION
 	cost_slot = BattleEnums.CostSlot.ACTION
+	attack_range = 1
 
 
 func can_activate(unit: Unit, ctx: AbilityContext) -> bool:

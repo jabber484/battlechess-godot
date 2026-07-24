@@ -6,7 +6,6 @@ signal attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int, h
 @export var grid_system_path: NodePath
 @export var turn_manager_path: NodePath
 
-const DISTANCE_PENALTY_PER_TILE := 5
 const HALF_COVER_PENALTY := 20
 const FULL_COVER_PENALTY := 40
 
@@ -19,41 +18,50 @@ func _ready() -> void:
 	turn_manager = get_node(turn_manager_path) as TurnManager
 
 
-func can_attack(attacker: Unit, defender: Unit) -> bool:
-	return _validate_attack(attacker, defender, false)
+func can_attack(attacker: Unit, defender: Unit, max_range: int) -> bool:
+	return _validate_attack(attacker, defender, false, max_range)
 
 
-func get_attackable_units(attacker: Unit, units: Array[Unit]) -> Array[Unit]:
+func get_attackable_units(attacker: Unit, units: Array[Unit], max_range: int) -> Array[Unit]:
 	var result: Array[Unit] = []
 	for unit in units:
-		if can_attack(attacker, unit):
+		if can_attack(attacker, unit, max_range):
 			result.append(unit)
 	return result
 
 
-func get_attackable_tiles(attacker: Unit, units: Array[Unit]) -> Array[Vector2i]:
+func get_attackable_tiles(attacker: Unit, units: Array[Unit], max_range: int) -> Array[Vector2i]:
 	var tiles: Array[Vector2i] = []
-	for unit in get_attackable_units(attacker, units):
+	for unit in get_attackable_units(attacker, units, max_range):
 		tiles.append(unit.grid_pos)
 	return tiles
 
 
-func compute_hit_chance(attacker: Unit, defender: Unit) -> int:
+func compute_hit_chance(
+	attacker: Unit,
+	defender: Unit,
+	distance_penalty_per_tile: int = 0,
+) -> int:
 	var distance := GridMath.manhattan(attacker.grid_pos, defender.grid_pos)
-	var distance_penalty := distance * DISTANCE_PENALTY_PER_TILE
+	var distance_penalty := distance * distance_penalty_per_tile
 	var cover_penalty := _cover_penalty(defender.grid_pos)
-	return clampi(attacker.accuracy - distance_penalty - cover_penalty, 5, 95)
+	return clampi(attacker.accuracy - distance_penalty - cover_penalty, 5, 100)
 
 
-func commit_attack(attacker: Unit, defender: Unit) -> Dictionary:
+func commit_attack(
+	attacker: Unit,
+	defender: Unit,
+	distance_penalty_per_tile: int,
+	max_range: int,
+) -> Dictionary:
 	var result := {
 		"hit": false,
 		"damage": 0,
 		"hit_chance": 0,
 	}
-	if not _validate_attack(attacker, defender, true):
+	if not _validate_attack(attacker, defender, true, max_range):
 		return result
-	var chance := compute_hit_chance(attacker, defender)
+	var chance := compute_hit_chance(attacker, defender, distance_penalty_per_tile)
 	result["hit_chance"] = chance
 	var roll := randi_range(1, 100)
 	var hit := roll <= chance
@@ -65,7 +73,12 @@ func commit_attack(attacker: Unit, defender: Unit) -> Dictionary:
 	return result
 
 
-func _validate_attack(attacker: Unit, defender: Unit, for_commit: bool) -> bool:
+func _validate_attack(
+	attacker: Unit,
+	defender: Unit,
+	for_commit: bool,
+	max_range: int,
+) -> bool:
 	if attacker == null or defender == null:
 		return false
 	if attacker.is_dead() or defender.is_dead():
@@ -78,7 +91,7 @@ func _validate_attack(attacker: Unit, defender: Unit, for_commit: bool) -> bool:
 				return false
 		elif not turn_manager.can_act(attacker):
 			return false
-	return GridMath.manhattan(attacker.grid_pos, defender.grid_pos) <= attacker.attack_range
+	return GridMath.manhattan(attacker.grid_pos, defender.grid_pos) <= max_range
 
 
 func _cover_penalty(grid_pos: Vector2i) -> int:

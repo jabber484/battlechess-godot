@@ -102,8 +102,12 @@ func run_unit_turn(unit: Unit) -> void:
 			targets.append(occupant)
 	if not targets.is_empty():
 		targets.sort_custom(func(a: Unit, b: Unit) -> bool:
-			var ca := combat_system.compute_hit_chance(unit, a)
-			var cb := combat_system.compute_hit_chance(unit, b)
+			var ca := combat_system.compute_hit_chance(
+				unit, a, _distance_penalty_for_target(unit, a, ctx)
+			)
+			var cb := combat_system.compute_hit_chance(
+				unit, b, _distance_penalty_for_target(unit, b, ctx)
+			)
 			if ca != cb:
 				return ca > cb
 			return a.current_hp < b.current_hp
@@ -120,19 +124,21 @@ func _score_tile(unit: Unit, tile: Vector2i, players: Array[Unit]) -> int:
 	var score := 0
 	var nearest := 999
 	var can_shoot_from_here := false
+	var distance_penalty_per_tile := _primary_attack_distance_penalty(unit)
+	var max_range := _primary_attack_range(unit)
 	for player in players:
 		var dist := GridMath.manhattan(tile, player.grid_pos)
 		nearest = mini(nearest, dist)
-		if dist <= unit.attack_range:
+		if dist <= max_range:
 			can_shoot_from_here = true
-			var distance_penalty := dist * CombatSystem.DISTANCE_PENALTY_PER_TILE
+			var distance_penalty := dist * distance_penalty_per_tile
 			var cover_penalty := 0
 			match grid_system.get_cover(player.grid_pos):
 				BattleEnums.Cover.HALF:
 					cover_penalty = CombatSystem.HALF_COVER_PENALTY
 				BattleEnums.Cover.FULL:
 					cover_penalty = CombatSystem.FULL_COVER_PENALTY
-			var chance := clampi(unit.accuracy - distance_penalty - cover_penalty, 5, 95)
+			var chance := clampi(unit.accuracy - distance_penalty - cover_penalty, 5, 100)
 			score += 40 + chance / 2
 			score += maxi(0, 40 - player.current_hp / 3)
 	score += maxi(0, 20 - nearest * 2)
@@ -154,3 +160,28 @@ func _instant_move(unit: Unit, to_pos: Vector2i) -> void:
 	var from := unit.grid_pos
 	grid_system.move_occupant(from, to_pos, unit)
 	turn_manager.notify_moved(unit)
+
+
+func _primary_attack_distance_penalty(unit: Unit) -> int:
+	for ability in unit.get_abilities_by_category(BattleEnums.AbilityCategory.ACTION):
+		if ability is SimpleAttackAbilityData:
+			return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
+	return 0
+
+
+func _primary_attack_range(unit: Unit) -> int:
+	for ability in unit.get_abilities_by_category(BattleEnums.AbilityCategory.ACTION):
+		if ability is SimpleAttackAbilityData:
+			return (ability as SimpleAttackAbilityData).attack_range
+	return 0
+
+
+func _distance_penalty_for_target(unit: Unit, target: Unit, ctx: AbilityContext) -> int:
+	var ability := unit.resolve_ability(
+		BattleEnums.AbilityCategory.ACTION,
+		target.grid_pos,
+		ctx,
+	)
+	if ability is SimpleAttackAbilityData:
+		return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
+	return 0

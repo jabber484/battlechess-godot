@@ -17,8 +17,7 @@ signal incoming_damage(context)
 @export var display_name: String = "Unit"
 @export var speed: int = 5
 @export var move_range: int = 4
-@export var attack_range: int = 5
-@export var accuracy: int = 80
+@export var accuracy: int = 100
 @export var damage: int = 25
 @export var max_hp: int = 100
 @export var max_moves: int = 1
@@ -55,8 +54,6 @@ func setup(p_team: BattleEnums.Team, p_pos: Vector2i, stats: Dictionary = {}) ->
 		speed = stats["speed"]
 	if stats.has("move_range"):
 		move_range = stats["move_range"]
-	if stats.has("attack_range"):
-		attack_range = stats["attack_range"]
 	if stats.has("accuracy"):
 		accuracy = stats["accuracy"]
 	if stats.has("damage"):

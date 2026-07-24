@@ -110,11 +110,13 @@ func _enhance_attack(unit: Unit, execution: Dictionary) -> void:
 	if not defender is Unit:
 		return
 	var target: Unit = defender as Unit
+	var distance_penalty_per_tile := int(execution.get("distance_penalty_per_tile", 0))
+	var max_range := int(execution.get("attack_range", 0))
 	execution["present"] = func() -> void:
 		focus_grid_pos(target.grid_pos)
 		await _host.get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
 		if _combat_system:
-			_combat_system.commit_attack(unit, target)
+			_combat_system.commit_attack(unit, target, distance_penalty_per_tile, max_range)
 		await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
 		focus_grid_pos(unit.grid_pos)
 

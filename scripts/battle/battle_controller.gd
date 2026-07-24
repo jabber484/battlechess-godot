@@ -172,7 +172,8 @@ func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
 	if ability == null:
 		battle_ui.set_status("Out of range")
 		return
-	var chance := combat_system.compute_hit_chance(attacker, defender)
+	var distance_penalty_per_tile := _distance_penalty_per_tile(ability)
+	var chance := combat_system.compute_hit_chance(attacker, defender, distance_penalty_per_tile)
 	if _pending_attack_target == defender:
 		await _execute_ability(ability, attacker, defender.grid_pos)
 	else:
@@ -262,3 +263,9 @@ func _log_color_for(unit: Unit) -> Color:
 	if unit.is_player():
 		return Color(0.55, 0.78, 1.0)
 	return Color(1.0, 0.55, 0.55)
+
+
+func _distance_penalty_per_tile(ability: AbilityData) -> int:
+	if ability is SimpleAttackAbilityData:
+		return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
+	return 0

@@ -1,0 +1,14 @@
+---
+description: Game balance design notes and targets for units, combat, and abilities
+globs: scripts/units/**/*.gd,scripts/data/unit_stats.gd,scripts/systems/combat_system.gd,scripts/data/default_battle_setup.gd,scripts/abilities/**/*.gd
+alwaysApply: false
+---
+
+# Game balance
+
+## Accuracy & hit chance
+
+- Units should start at **100% accuracy** by default.
+- Without other factors (distance, cover, status, etc.), attacks are **deterministic** (always hit).
+- Miss chance comes only from situational modifiers (and ability-specific falloff), not from a base accuracy deficit.
+- Attack `attack_range` and distance falloff (`distance_penalty_per_tile`) live on the attack ability, not the unit.

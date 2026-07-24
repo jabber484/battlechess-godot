@@ -14,7 +14,7 @@ static func get_unit_spawns() -> Array[UnitSpawnData]:
 		UnitSpawnData.new(
 			BattleEnums.Team.PLAYER,
 			Vector2i(10, 10),
-			_make_stats("Scout", 8, 5, 5, 75, 22, 90),
+			_make_stats("Scout", 8, 5, 100, 22, 90),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.PLAYER,
@@ -24,17 +24,17 @@ static func get_unit_spawns() -> Array[UnitSpawnData]:
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
 			Vector2i(1, 1),
-			_make_stats("Raider", 7, 4, 5, 72, 20, 85),
+			_make_stats("Raider", 7, 4, 100, 20, 85),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
 			Vector2i(2, 1),
-			_make_stats("Guard", 5, 3, 4, 68, 24, 100),
+			_make_stats("Guard", 5, 3, 100, 24, 100),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
 			Vector2i(1, 2),
-			_make_stats("Sniper", 3, 3, 7, 80, 28, 75),
+			_make_stats("Sniper", 3, 3, 100, 28, 75),
 		),
 	]
 
@@ -43,7 +43,6 @@ static func _make_stats(
 	display_name: String,
 	speed: int,
 	move_range: int,
-	attack_range: int,
 	accuracy: int,
 	damage: int,
 	max_hp: int,
@@ -52,7 +51,6 @@ static func _make_stats(
 	stats.display_name = display_name
 	stats.speed = speed
 	stats.move_range = move_range
-	stats.attack_range = attack_range
 	stats.accuracy = accuracy
 	stats.damage = damage
 	stats.max_hp = max_hp
@@ -68,8 +66,7 @@ static func _make_warrior_stats() -> UnitStatsData:
 	stats.display_name = "Warrior"
 	stats.speed = 5
 	stats.move_range = 3
-	stats.attack_range = 2
-	stats.accuracy = 75
+	stats.accuracy = 100
 	stats.damage = 30
 	stats.max_hp = 110
 	stats.resource_id = BattleEnums.UnitResource.STAMINA

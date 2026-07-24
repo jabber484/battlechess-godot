@@ -1,6 +1,10 @@
 class_name SimpleAttackAbilityData
 extends AbilityData
 
+@export var attack_range: int = 5
+## Hit-chance reduction per Manhattan tile of range. 0 = no distance falloff.
+@export var distance_penalty_per_tile: int = 5
+
 
 func _init() -> void:
 	id = &"simple_attack"
@@ -14,7 +18,7 @@ func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
 	if unit == null or ctx == null or ctx.battle_state == null:
 		return result
 	for enemy in _opposing_living(unit, ctx):
-		if GridMath.manhattan(unit.grid_pos, enemy.grid_pos) <= unit.attack_range:
+		if GridMath.manhattan(unit.grid_pos, enemy.grid_pos) <= attack_range:
 			result.append(enemy.grid_pos)
 	return result
 
@@ -27,7 +31,7 @@ func is_valid_target(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> b
 		return false
 	if occupant.team == unit.team:
 		return false
-	return GridMath.manhattan(unit.grid_pos, occupant.grid_pos) <= unit.attack_range
+	return GridMath.manhattan(unit.grid_pos, occupant.grid_pos) <= attack_range
 
 
 func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> Dictionary:
@@ -53,6 +57,8 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 		"death_units": [unit, defender],
 		"defender": defender,
 		"presentation": BattleEnums.Presentation.ATTACK,
+		"distance_penalty_per_tile": distance_penalty_per_tile,
+		"attack_range": attack_range,
 	}
 
 

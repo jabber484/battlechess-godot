@@ -10,7 +10,7 @@ alwaysApply: false
 
 - Abilities are `AbilityData` Resources under `scripts/abilities/`. They define **behavior and rules**, not combat stats.
 - Units own an `Array[AbilityData]`. Attach via `UnitStats.abilities`; `Unit.setup` **duplicates** ability resources per instance.
-- All numeric combat stats (`move_range`, `attack_range`, `accuracy`, `damage`, HP, move/action budgets, …) live on **`Unit` / `UnitStats`**. Abilities **read** from the unit; never re-export those fields on the ability.
+- Core combat stats (`move_range`, `accuracy`, `damage`, HP, move/action budgets, …) live on **`Unit` / `UnitStats`**. Attack **range** and **distance falloff** live on the attack ability; abilities still read damage/accuracy from the unit.
 - Prefer the name **ability** (not skill) in code, paths, and docs.
 
 ## Required AbilityData API
@@ -27,11 +27,13 @@ alwaysApply: false
 - Without an ability picker: first matching ability wins; MOVE and ACTION highlights are each the **union** of activatable abilities in that category.
 - Presentation (camera/tweens/move log) is owned by `BattlePresenter`; `BattleController` orchestrates; `ActionRunner` remains the execution pipeline.
 - Hit/damage math stays in `CombatSystem`; attack presentation calls into it (same role pathfinding plays for move).
+- Attack `attack_range` and `distance_penalty_per_tile` live on attack abilities (e.g. `SimpleAttackAbilityData`), passed into `CombatSystem`. Cover penalties stay global on `CombatSystem`.
+- Warrior basic attack: `attack_range = 1`.
 
 ## Adding a new ability
 
 1. Subclass `AbilityData` (e.g. `SimpleMoveAbilityData`, `SimpleAttackAbilityData`, `LeapAbilityData`), unique `id`, set `category` / `cost_slot`.
-2. Override the four methods; read ranges/damage/accuracy from `unit`.
+2. Override the four methods; read damage/accuracy from `unit`; set attack `attack_range` / falloff on the ability.
 3. Put an instance on the unit’s `abilities` array (via `UnitStats` / spawn setup).
 4. Do not add parallel execute paths in the controller when category resolve already covers it.
 
