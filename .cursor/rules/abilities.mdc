@@ -1,0 +1,39 @@
+---
+description: Ability system conventions — Resource abilities, unit-owned stats, category dispatch
+globs: scripts/abilities/**/*.gd,scripts/units/unit.gd,scripts/data/unit_stats.gd,scripts/battle/battle_controller.gd,scripts/systems/ai_system.gd,scripts/systems/pathfinding_system.gd
+alwaysApply: false
+---
+
+# Ability system
+
+## Ability model
+
+- Abilities are `AbilityData` Resources under `scripts/abilities/`. They define **behavior and rules**, not combat stats.
+- Units own an `Array[AbilityData]`. Attach via `UnitStats.abilities`; `Unit.setup` **duplicates** ability resources per instance.
+- All numeric combat stats (`move_range`, `attack_range`, `accuracy`, `damage`, HP, move/action budgets, …) live on **`Unit` / `UnitStats`**. Abilities **read** from the unit; never re-export those fields on the ability.
+- Prefer the name **ability** (not skill) in code, paths, and docs.
+
+## Required AbilityData API
+
+- Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION`), `cost_slot` (`MOVE` → `notify_moved`, `ACTION` → `notify_acted`)
+- Methods: `can_activate(unit, ctx)`, `get_target_tiles(unit, ctx)`, `is_valid_target(unit, target_pos, ctx)`, `build_execution(unit, target_pos, ctx) -> Dictionary` (`commit` / `present` / `complete` / `death_units`)
+- Use `AbilityContext` for system refs (`pathfinding`, `grid_system`, `turn_manager`, `battle_state`). Abilities must not cache Node paths.
+
+## Dispatch
+
+- Do not hardcode ability ids for click/AI routing. Resolve by `category` + `can_activate` + `is_valid_target`.
+- Without an ability picker: first matching ability wins; MOVE highlights are the union of activatable MOVE abilities’ tiles.
+- Presentation (tweens/camera) may be injected by `BattleController`; `ActionRunner` remains the execution pipeline.
+
+## Adding a new ability
+
+1. Subclass `AbilityData` (e.g. `SimpleMoveAbilityData`, `LeapAbilityData`), unique `id`, set `category` / `cost_slot`.
+2. Override the four methods; read ranges/damage/accuracy from `unit`.
+3. Put an instance on the unit’s `abilities` array (via `UnitStats` / spawn setup).
+4. Do not add parallel execute paths in the controller when category resolve already covers it.
+
+Standard walk ability: `SimpleMoveAbilityData` (`id = &"simple_move"`).
+
+## Out of scope reminders
+
+- Ability picker UI, cooldowns, and AttackAbility migration are future work; keep the API above stable for them.

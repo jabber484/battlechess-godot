@@ -23,6 +23,7 @@ var current_hp: int = 100
 var moves_used: int = 0
 var actions_used: int = 0
 var death_processed: bool = false
+var abilities: Array[AbilityData] = []
 
 @onready var _mesh: MeshInstance3D = $MeshInstance3D
 @onready var _hud: UnitHUD = $UnitHUD
@@ -56,10 +57,48 @@ func setup(p_team: BattleEnums.Team, p_pos: Vector2i, stats: Dictionary = {}) ->
 		max_moves = stats["max_moves"]
 	if stats.has("max_actions"):
 		max_actions = stats["max_actions"]
+	if stats.has("abilities"):
+		abilities.clear()
+		for ability in stats["abilities"]:
+			if ability is AbilityData:
+				abilities.append((ability as AbilityData).duplicate(true) as AbilityData)
 	current_hp = max_hp
 	_apply_team_color()
 	_update_world_position()
 	_refresh_hud()
+
+
+func get_ability(ability_id: StringName) -> AbilityData:
+	for ability in abilities:
+		if ability and ability.id == ability_id:
+			return ability
+	return null
+
+
+func get_abilities_by_category(category: BattleEnums.AbilityCategory) -> Array[AbilityData]:
+	var result: Array[AbilityData] = []
+	for ability in abilities:
+		if ability and ability.category == category:
+			result.append(ability)
+	return result
+
+
+func get_move_ability() -> AbilityData:
+	var move_abilities := get_abilities_by_category(BattleEnums.AbilityCategory.MOVE)
+	if move_abilities.is_empty():
+		return null
+	return move_abilities[0]
+
+
+func resolve_ability(
+	category: BattleEnums.AbilityCategory,
+	target_pos: Vector2i,
+	ctx: AbilityContext,
+) -> AbilityData:
+	for ability in get_abilities_by_category(category):
+		if ability.can_activate(self, ctx) and ability.is_valid_target(self, target_pos, ctx):
+			return ability
+	return null
 
 
 func _refresh_hud() -> void:

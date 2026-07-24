@@ -10,6 +10,7 @@ extends Resource
 @export var max_hp: int = 100
 @export var max_moves: int = 1
 @export var max_actions: int = 1
+@export var abilities: Array[AbilityData] = []
 
 
 func to_dict() -> Dictionary:
@@ -23,4 +24,5 @@ func to_dict() -> Dictionary:
 		"max_hp": max_hp,
 		"max_moves": max_moves,
 		"max_actions": max_actions,
+		"abilities": abilities,
 	}

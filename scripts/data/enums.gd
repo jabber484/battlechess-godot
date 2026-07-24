@@ -8,3 +8,7 @@ enum Cover { NONE, HALF, FULL }
 enum TurnPhase { IDLE, UNIT_TURN, ROUND_END, BATTLE_OVER }
 
 enum BattleResult { NONE, VICTORY, DEFEAT }
+
+enum AbilityCategory { MOVE, ACTION }
+
+enum CostSlot { MOVE, ACTION }

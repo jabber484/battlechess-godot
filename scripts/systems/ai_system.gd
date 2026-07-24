@@ -25,6 +25,10 @@ func _ready() -> void:
 	battle_state = get_node(battle_state_path) as BattleState
 
 
+func _make_ability_ctx() -> AbilityContext:
+	return AbilityContext.new(pathfinding, grid_system, turn_manager, battle_state)
+
+
 func set_move_executor(mover: Callable) -> void:
 	_mover = mover
 
@@ -46,7 +50,17 @@ func run_unit_turn(unit: Unit) -> void:
 		turn_manager.finish_turn(unit)
 		return
 
-	var reachable := pathfinding.get_reachable_tiles(unit)
+	var reachable: Array[Vector2i] = []
+	var seen: Dictionary = {}
+	var ctx := _make_ability_ctx()
+	for ability in unit.get_abilities_by_category(BattleEnums.AbilityCategory.MOVE):
+		if not ability.can_activate(unit, ctx):
+			continue
+		for tile in ability.get_target_tiles(unit, ctx):
+			if seen.has(tile):
+				continue
+			seen[tile] = true
+			reachable.append(tile)
 	reachable.append(unit.grid_pos)
 	var best_tile := unit.grid_pos
 	var best_score := -999999
@@ -56,10 +70,15 @@ func run_unit_turn(unit: Unit) -> void:
 			best_score = score
 			best_tile = tile
 
-	if best_tile != unit.grid_pos and turn_manager.can_move(unit):
-		if _mover.is_valid():
+	if best_tile != unit.grid_pos:
+		var move_ability := unit.resolve_ability(
+			BattleEnums.AbilityCategory.MOVE,
+			best_tile,
+			ctx,
+		)
+		if move_ability and _mover.is_valid():
 			await _mover.call(unit, best_tile)
-		else:
+		elif move_ability:
 			_instant_move(unit, best_tile)
 	if not turn_manager.owns_turn(unit):
 		return

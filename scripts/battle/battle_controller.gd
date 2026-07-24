@@ -3,6 +3,7 @@ extends Node3D
 
 const BattleSpawnerScript := preload("res://scripts/battle/battle_spawner.gd")
 const DefaultBattleSetupScript := preload("res://scripts/data/default_battle_setup.gd")
+const AbilityContextScript := preload("res://scripts/abilities/ability_context.gd")
 const MOVE_TILE_DURATION := 0.28
 const ATTACK_CAMERA_DELAY := 0.5
 const ATTACK_FOCUS_DURATION := 1.0
@@ -21,10 +22,12 @@ const ATTACK_FOCUS_DURATION := 1.0
 
 var _units: Array[Unit] = []
 var _pending_attack_target: Unit = null
+var _ability_ctx: AbilityContext
 
 
 func _ready() -> void:
 	randomize()
+	_ability_ctx = AbilityContextScript.new(pathfinding, grid_system, turn_manager, battle_state)
 	_connect_signals()
 	_units = BattleSpawnerScript.spawn_units(
 		DefaultBattleSetupScript.get_unit_spawns(),
@@ -40,7 +43,7 @@ func _ready() -> void:
 
 
 func _connect_signals() -> void:
-	ai_system.set_move_executor(_execute_move)
+	ai_system.set_move_executor(_execute_ai_move)
 	ai_system.set_attack_executor(_execute_attack)
 	grid_view.tile_picked.connect(_on_tile_picked)
 	turn_manager.round_started.connect(_on_round_started)
@@ -145,8 +148,13 @@ func _on_tile_picked(grid_pos: Vector2i) -> void:
 		_handle_attack_click(active, occupant)
 		return
 
-	if turn_manager.can_move(active) and pathfinding.is_reachable(active, grid_pos):
-		_execute_move(active, grid_pos)
+	var move_ability := active.resolve_ability(
+		BattleEnums.AbilityCategory.MOVE,
+		grid_pos,
+		_ability_ctx,
+	)
+	if move_ability:
+		await _execute_ability(move_ability, active, grid_pos)
 		return
 
 	_pending_attack_target = null
@@ -167,35 +175,58 @@ func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
 		battle_ui.set_status("Targeting %s" % defender.display_name)
 
 
-func _execute_move(unit: Unit, to_pos: Vector2i) -> void:
-	if turn_manager.is_busy():
+func _execute_ai_move(unit: Unit, to_pos: Vector2i) -> void:
+	var ability := unit.resolve_ability(BattleEnums.AbilityCategory.MOVE, to_pos, _ability_ctx)
+	if ability == null:
 		return
-	var path := pathfinding.find_path(unit.grid_pos, to_pos, unit)
-	if path.size() < 2:
-		return
-	grid_view.clear_highlights()
-	var from := unit.grid_pos
-	var tile_count := path.size() - 1
-	camera_rig.focus_on(GridMath.grid_to_world(to_pos))
+	await _execute_ability(ability, unit, to_pos)
 
-	await action_runner.run(
-		func() -> void:
-			grid_system.move_occupant(from, to_pos, unit, false),
-		func() -> void:
-			await _tween_along_path(unit, path),
-		func() -> void:
-			turn_manager.notify_moved(unit)
+
+func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) -> void:
+	if turn_manager.is_busy() or ability == null:
+		return
+	if not ability.can_activate(unit, _ability_ctx) or not ability.is_valid_target(unit, target_pos, _ability_ctx):
+		return
+	var execution := ability.build_execution(unit, target_pos, _ability_ctx)
+	var commit: Callable = execution.get("commit", Callable())
+	var present: Callable = execution.get("present", Callable())
+	var complete: Callable = execution.get("complete", Callable())
+	var death_units: Array = execution.get("death_units", [])
+	if not commit.is_valid() and not present.is_valid() and not complete.is_valid():
+		return
+
+	# SimpleMoveAbility: inject path tween when present was left empty.
+	var path: Array = execution.get("path", [])
+	if ability is SimpleMoveAbilityData and path.size() >= 2 and not present.is_valid():
+		var from := unit.grid_pos
+		var tile_count := path.size() - 1
+		var typed_path: Array[Vector2i] = []
+		for step in path:
+			typed_path.append(step as Vector2i)
+		camera_rig.focus_on(GridMath.grid_to_world(target_pos))
+		present = func() -> void:
+			await _tween_along_path(unit, typed_path)
+		var notify_complete := complete
+		complete = func() -> void:
+			if notify_complete.is_valid():
+				notify_complete.call()
 			battle_ui.append_log(
 				"%s moves %s → %s (%d tiles)" % [
 					unit.display_name,
 					_fmt_grid_pos(from),
-					_fmt_grid_pos(to_pos),
+					_fmt_grid_pos(target_pos),
 					tile_count,
 				],
 				_log_color_for(unit),
-			),
-		[unit],
-	)
+			)
+
+	grid_view.clear_highlights()
+	var typed_death: Array[Unit] = []
+	for u in death_units:
+		if u is Unit:
+			typed_death.append(u as Unit)
+
+	await action_runner.run(commit, present, complete, typed_death)
 	_refresh_highlights()
 
 
@@ -235,8 +266,18 @@ func _refresh_highlights() -> void:
 	var active := turn_manager.active_unit
 	if active == null or not active.is_player() or battle_state.is_over():
 		return
-	if turn_manager.can_move(active):
-		grid_view.show_reachable(pathfinding.get_reachable_tiles(active))
+	var move_tiles: Array[Vector2i] = []
+	var seen: Dictionary = {}
+	for ability in active.get_abilities_by_category(BattleEnums.AbilityCategory.MOVE):
+		if not ability.can_activate(active, _ability_ctx):
+			continue
+		for tile in ability.get_target_tiles(active, _ability_ctx):
+			if seen.has(tile):
+				continue
+			seen[tile] = true
+			move_tiles.append(tile)
+	if not move_tiles.is_empty():
+		grid_view.show_reachable(move_tiles)
 	if turn_manager.can_act(active):
 		grid_view.show_attackable(combat_system.get_attackable_tiles(active, battle_state.get_living_enemies()))
 
