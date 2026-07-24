@@ -52,6 +52,7 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 				turn_manager.notify_acted(unit),
 		"death_units": [unit, defender],
 		"defender": defender,
+		"presentation": BattleEnums.Presentation.ATTACK,
 	}
 
 

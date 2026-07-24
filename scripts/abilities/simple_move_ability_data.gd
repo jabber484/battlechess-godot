@@ -47,4 +47,5 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 				turn_manager.notify_moved(unit),
 		"death_units": [unit],
 		"path": path,
+		"presentation": BattleEnums.Presentation.MOVE,
 	}

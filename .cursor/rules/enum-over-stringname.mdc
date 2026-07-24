@@ -1,0 +1,34 @@
+---
+description: Prefer Enum over StringName for closed value sets in GDScript
+globs: **/*.gd
+alwaysApply: false
+---
+
+# Enum over StringName
+
+Prefer **`enum`** (usually on `BattleEnums`) over **`StringName`** for identifiers that are a known, closed set.
+
+## Prefer enum when
+
+- Values are fixed and few (resource types, presentation kinds, categories, teams)
+- Inspector should show a dropdown
+- Typos should fail at edit/compile time
+- Call sites compare against a finite list (`STAMINA`, `MANA`, …)
+
+```gdscript
+# ❌ BAD — open stringly typed set
+@export var resource_id: StringName = &""
+execution["presentation"] = &"attack"
+
+# ✅ GOOD
+@export var resource_id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE
+execution["presentation"] = BattleEnums.Presentation.ATTACK
+```
+
+## StringName is OK when
+
+- Identity is **data-driven / open-ended** (ability `id` like `&"warrior_basic_attack"` — new content without code changes)
+- Interop with Godot APIs that expect `StringName` (signals, input actions, node names)
+- Keys in heterogeneous dictionaries where an enum would be forced/awkward
+
+If unsure, default to **enum**. Only use `StringName` when you can name one of the reasons above.

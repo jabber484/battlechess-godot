@@ -1,6 +1,6 @@
 ---
 description: Ability system conventions — Resource abilities, unit-owned stats, category dispatch
-globs: scripts/abilities/**/*.gd,scripts/units/unit.gd,scripts/data/unit_stats.gd,scripts/battle/battle_controller.gd,scripts/systems/ai_system.gd,scripts/systems/pathfinding_system.gd
+globs: scripts/abilities/**/*.gd,scripts/units/unit.gd,scripts/data/unit_stats.gd,scripts/battle/battle_controller.gd,scripts/battle/battle_presenter.gd,scripts/systems/ai_system.gd,scripts/systems/pathfinding_system.gd
 alwaysApply: false
 ---
 
@@ -15,16 +15,18 @@ alwaysApply: false
 
 ## Required AbilityData API
 
-- Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION`), `cost_slot` (`MOVE` → `notify_moved`, `ACTION` → `notify_acted`)
+- Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION` | `PASSIVE`), `cost_slot` (`MOVE` → `notify_moved`, `ACTION` → `notify_acted`, `NONE` for passives)
 - Methods: `can_activate(unit, ctx)`, `get_target_tiles(unit, ctx)`, `is_valid_target(unit, target_pos, ctx)`, `build_execution(unit, target_pos, ctx) -> Dictionary` (`commit` / `present` / `complete` / `death_units`)
+- Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` when needed. `Unit.modify_incoming_damage` dispatches to `PASSIVE` abilities.
 - Use `AbilityContext` for system refs (`pathfinding`, `grid_system`, `turn_manager`, `battle_state`, `combat_system`). Abilities must not cache Node paths.
+- Execution may include intent for presentation: `presentation` (`BattleEnums.Presentation`), plus `path` / `defender`. Leave `present` empty so `BattlePresenter` fills camera/tweens. Do not reference `CameraRig` from abilities.
 
 ## Dispatch
 
 - Do not hardcode ability ids for click/AI routing. Resolve by `category` + `can_activate` + `is_valid_target`.
 - Without an ability picker: first matching ability wins; MOVE and ACTION highlights are each the **union** of activatable abilities in that category.
-- Presentation (tweens/camera) may be injected by `BattleController`; `ActionRunner` remains the execution pipeline.
-- Hit/damage math stays in `CombatSystem`; `SimpleAttackAbilityData` calls into it (same role pathfinding plays for move).
+- Presentation (camera/tweens/move log) is owned by `BattlePresenter`; `BattleController` orchestrates; `ActionRunner` remains the execution pipeline.
+- Hit/damage math stays in `CombatSystem`; attack presentation calls into it (same role pathfinding plays for move).
 
 ## Adding a new ability
 
@@ -37,6 +39,8 @@ Standard abilities:
 
 - Walk: `SimpleMoveAbilityData` (`id = &"simple_move"`)
 - Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`)
+- Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost, extends simple attack
+- Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 
 ## Out of scope reminders
 

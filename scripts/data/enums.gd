@@ -9,8 +9,10 @@ enum TurnPhase { IDLE, UNIT_TURN, ROUND_END, BATTLE_OVER }
 
 enum BattleResult { NONE, VICTORY, DEFEAT }
 
-enum AbilityCategory { MOVE, ACTION }
+enum AbilityCategory { MOVE, ACTION, PASSIVE }
 
-enum CostSlot { MOVE, ACTION }
+enum CostSlot { MOVE, ACTION, NONE }
 
 enum UnitResource { NONE, STAMINA, MANA, ENERGY }
+
+enum Presentation { NONE, MOVE, ATTACK }

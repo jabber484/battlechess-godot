@@ -2,11 +2,9 @@ class_name BattleController
 extends Node3D
 
 const BattleSpawnerScript := preload("res://scripts/battle/battle_spawner.gd")
+const BattlePresenterScript := preload("res://scripts/battle/battle_presenter.gd")
 const DefaultBattleSetupScript := preload("res://scripts/data/default_battle_setup.gd")
 const AbilityContextScript := preload("res://scripts/abilities/ability_context.gd")
-const MOVE_TILE_DURATION := 0.28
-const ATTACK_CAMERA_DELAY := 0.5
-const ATTACK_FOCUS_DURATION := 1.0
 
 @onready var grid_system: GridSystem = $Systems/GridSystem
 @onready var pathfinding: PathfindingSystem = $Systems/PathfindingSystem
@@ -23,6 +21,7 @@ const ATTACK_FOCUS_DURATION := 1.0
 var _units: Array[Unit] = []
 var _pending_attack_target: Unit = null
 var _ability_ctx: AbilityContext
+var _presenter: BattlePresenter
 
 
 func _ready() -> void:
@@ -30,6 +29,7 @@ func _ready() -> void:
 	_ability_ctx = AbilityContextScript.new(
 		pathfinding, grid_system, turn_manager, battle_state, combat_system
 	)
+	_presenter = BattlePresenterScript.new(self, camera_rig, combat_system, battle_ui)
 	_connect_signals()
 	_units = BattleSpawnerScript.spawn_units(
 		DefaultBattleSetupScript.get_unit_spawns(),
@@ -74,7 +74,7 @@ func _on_turn_started(unit: Unit) -> void:
 	battle_ui.set_active_unit(unit)
 	battle_ui.set_hit_chance("")
 	battle_ui.set_end_turn_enabled(unit.is_player())
-	camera_rig.focus_on(GridMath.grid_to_world(unit.grid_pos))
+	_presenter.focus_unit(unit)
 	_refresh_highlights()
 	var team_tag := "Player" if unit.is_player() else "Enemy"
 	battle_ui.append_log("[%s] %s's turn" % [team_tag, unit.display_name], _log_color_for(unit))
@@ -177,7 +177,7 @@ func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
 		await _execute_ability(ability, attacker, defender.grid_pos)
 	else:
 		_pending_attack_target = defender
-		camera_rig.focus_on(GridMath.grid_to_world(defender.grid_pos))
+		_presenter.focus_unit(defender)
 		battle_ui.set_hit_chance("Hit chance: %d%% — click again to confirm" % chance)
 		battle_ui.set_status("Targeting %s" % defender.display_name)
 
@@ -208,48 +208,13 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 	if not ability.can_activate(unit, _ability_ctx) or not ability.is_valid_target(unit, target_pos, _ability_ctx):
 		return
 	var execution := ability.build_execution(unit, target_pos, _ability_ctx)
+	execution = _presenter.enhance_execution(unit, target_pos, execution)
 	var commit: Callable = execution.get("commit", Callable())
 	var present: Callable = execution.get("present", Callable())
 	var complete: Callable = execution.get("complete", Callable())
 	var death_units: Array = execution.get("death_units", [])
 	if not commit.is_valid() and not present.is_valid() and not complete.is_valid():
 		return
-
-	# SimpleMoveAbility: inject path tween when present was left empty.
-	var path: Array = execution.get("path", [])
-	if ability is SimpleMoveAbilityData and path.size() >= 2 and not present.is_valid():
-		var from := unit.grid_pos
-		var tile_count := path.size() - 1
-		var typed_path: Array[Vector2i] = []
-		for step in path:
-			typed_path.append(step as Vector2i)
-		camera_rig.focus_on(GridMath.grid_to_world(target_pos))
-		present = func() -> void:
-			await _tween_along_path(unit, typed_path)
-		var notify_complete := complete
-		complete = func() -> void:
-			if notify_complete.is_valid():
-				notify_complete.call()
-			battle_ui.append_log(
-				"%s moves %s → %s (%d tiles)" % [
-					unit.display_name,
-					_fmt_grid_pos(from),
-					_fmt_grid_pos(target_pos),
-					tile_count,
-				],
-				_log_color_for(unit),
-			)
-
-	# SimpleAttackAbility: inject camera + commit_attack when present was left empty.
-	var defender = execution.get("defender", null)
-	if ability is SimpleAttackAbilityData and defender is Unit and not present.is_valid():
-		var target: Unit = defender as Unit
-		present = func() -> void:
-			camera_rig.focus_on(GridMath.grid_to_world(target.grid_pos))
-			await get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
-			_ability_ctx.combat_system.commit_attack(unit, target)
-			await get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
-			camera_rig.focus_on(GridMath.grid_to_world(unit.grid_pos))
 
 	grid_view.clear_highlights()
 	var typed_death: Array[Unit] = []
@@ -259,15 +224,6 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 
 	await action_runner.run(commit, present, complete, typed_death)
 	_refresh_highlights()
-
-
-func _tween_along_path(unit: Unit, path: Array[Vector2i]) -> void:
-	for i in range(1, path.size()):
-		var target_world := GridMath.grid_to_world(path[i], 0.5)
-		var tween := create_tween()
-		tween.tween_property(unit, "global_position", target_world, MOVE_TILE_DURATION)
-		await tween.finished
-	unit.set_grid_pos(path[path.size() - 1])
 
 
 func _refresh_highlights() -> void:
@@ -306,7 +262,3 @@ func _log_color_for(unit: Unit) -> Color:
 	if unit.is_player():
 		return Color(0.55, 0.78, 1.0)
 	return Color(1.0, 0.55, 0.55)
-
-
-func _fmt_grid_pos(pos: Vector2i) -> String:
-	return "(%d,%d)" % [pos.x, pos.y]

@@ -8,6 +8,8 @@ extends Resource
 
 
 func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
+	if category == BattleEnums.AbilityCategory.PASSIVE:
+		return false
 	if unit == null or ctx == null or ctx.turn_manager == null:
 		return false
 	if not ctx.turn_manager.owns_turn(unit) or ctx.turn_manager.is_busy():
@@ -42,3 +44,8 @@ func build_execution(
 		"complete": Callable(),
 		"death_units": [],
 	}
+
+
+## Passive hook: mutate DamageContext before HP is applied.
+func on_incoming_damage(_unit: Unit, _context) -> void:
+	pass

@@ -22,10 +22,17 @@ func _ready() -> void:
 func run( commit: Callable, present: Callable, complete: Callable = Callable(), death_units: Array[Unit] = [] ) -> void:
 	turn_manager.set_busy(true)
 	action_started.emit()
+	var aborted := false
 	if commit.is_valid():
-		commit.call()
-	if present.is_valid():
+		var commit_result: Variant = commit.call()
+		if commit_result == false:
+			aborted = true
+	if not aborted and present.is_valid():
 		await present.call()
+	if aborted:
+		turn_manager.set_busy(false)
+		action_ended.emit()
+		return
 	var units_to_check := death_units
 	if units_to_check.is_empty() and battle_state:
 		units_to_check = battle_state.get_units()

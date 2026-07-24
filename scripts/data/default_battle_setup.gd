@@ -5,6 +5,8 @@ const UnitSpawnData := preload("res://scripts/data/unit_spawn.gd")
 const UnitStatsData := preload("res://scripts/data/unit_stats.gd")
 const SimpleMoveAbilityDataScript := preload("res://scripts/abilities/simple_move_ability_data.gd")
 const SimpleAttackAbilityDataScript := preload("res://scripts/abilities/simple_attack_ability_data.gd")
+const WarriorBasicAttackAbilityDataScript := preload("res://scripts/abilities/warrior_basic_attack_ability_data.gd")
+const WarriorStaminaShieldAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_shield_ability_data.gd")
 
 
 static func get_unit_spawns() -> Array[UnitSpawnData]:
@@ -17,7 +19,7 @@ static func get_unit_spawns() -> Array[UnitSpawnData]:
 		UnitSpawnData.new(
 			BattleEnums.Team.PLAYER,
 			Vector2i(9, 10),
-			_make_stats("Heavy", 4, 3, 6, 70, 32, 120),
+			_make_warrior_stats(),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
@@ -57,5 +59,24 @@ static func _make_stats(
 	var abilities: Array[AbilityData] = []
 	abilities.append(SimpleMoveAbilityDataScript.new())
 	abilities.append(SimpleAttackAbilityDataScript.new())
+	stats.abilities = abilities
+	return stats
+
+
+static func _make_warrior_stats() -> UnitStatsData:
+	var stats := UnitStatsData.new()
+	stats.display_name = "Warrior"
+	stats.speed = 5
+	stats.move_range = 3
+	stats.attack_range = 2
+	stats.accuracy = 75
+	stats.damage = 30
+	stats.max_hp = 110
+	stats.resource_id = BattleEnums.UnitResource.STAMINA
+	stats.max_resource = 50
+	var abilities: Array[AbilityData] = []
+	abilities.append(SimpleMoveAbilityDataScript.new())
+	abilities.append(WarriorBasicAttackAbilityDataScript.new())
+	abilities.append(WarriorStaminaShieldAbilityDataScript.new())
 	stats.abilities = abilities
 	return stats

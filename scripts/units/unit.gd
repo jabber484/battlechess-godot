@@ -237,8 +237,13 @@ func receive_damage(amount: int, attacker: Unit = null) -> int:
 	return applied
 
 
-func modify_incoming_damage(_context) -> void:
-	pass
+func modify_incoming_damage(context) -> void:
+	for ability in abilities:
+		if ability == null:
+			continue
+		if ability.category != BattleEnums.AbilityCategory.PASSIVE:
+			continue
+		ability.on_incoming_damage(self, context)
 
 
 func _build_damage_context(amount: int, attacker: Unit) -> RefCounted:
