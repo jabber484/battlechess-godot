@@ -5,6 +5,12 @@ const _DamageContextRes = preload("res://scripts/data/damage_context.gd")
 
 signal died(unit: Unit)
 signal hp_changed(unit: Unit, current_hp: int, max_hp: int)
+signal resource_changed(
+	unit: Unit,
+	resource_id: BattleEnums.UnitResource,
+	current: int,
+	max_resource: int,
+)
 signal incoming_damage(context)
 
 @export var team: BattleEnums.Team = BattleEnums.Team.PLAYER
@@ -17,9 +23,12 @@ signal incoming_damage(context)
 @export var max_hp: int = 100
 @export var max_moves: int = 1
 @export var max_actions: int = 1
+@export var resource_id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE
+@export var max_resource: int = 0
 
 var grid_pos: Vector2i = Vector2i.ZERO
 var current_hp: int = 100
+var current_resource: int = 0
 var moves_used: int = 0
 var actions_used: int = 0
 var death_processed: bool = false
@@ -31,6 +40,7 @@ var abilities: Array[AbilityData] = []
 
 func _ready() -> void:
 	current_hp = max_hp
+	current_resource = max_resource if has_resource() else 0
 	_apply_team_color()
 	_update_world_position()
 	_refresh_hud()
@@ -57,12 +67,17 @@ func setup(p_team: BattleEnums.Team, p_pos: Vector2i, stats: Dictionary = {}) ->
 		max_moves = stats["max_moves"]
 	if stats.has("max_actions"):
 		max_actions = stats["max_actions"]
+	if stats.has("resource_id"):
+		resource_id = stats["resource_id"] as BattleEnums.UnitResource
+	if stats.has("max_resource"):
+		max_resource = int(stats["max_resource"])
 	if stats.has("abilities"):
 		abilities.clear()
 		for ability in stats["abilities"]:
 			if ability is AbilityData:
 				abilities.append((ability as AbilityData).duplicate(true) as AbilityData)
 	current_hp = max_hp
+	current_resource = max_resource if has_resource() else 0
 	_apply_team_color()
 	_update_world_position()
 	_refresh_hud()
@@ -141,6 +156,58 @@ func can_move_more() -> bool:
 
 func can_act_more() -> bool:
 	return actions_used < max_actions
+
+
+func has_resource(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> bool:
+	if resource_id == BattleEnums.UnitResource.NONE or max_resource <= 0:
+		return false
+	return id == BattleEnums.UnitResource.NONE or resource_id == id
+
+
+func get_resource(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> int:
+	return current_resource if has_resource(id) else 0
+
+
+func get_resource_space(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> int:
+	if not has_resource(id):
+		return 0
+	return maxi(0, max_resource - current_resource)
+
+
+func spend_resource(
+	amount: int,
+	id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE,
+) -> bool:
+	if amount <= 0:
+		return has_resource(id)
+	if not has_resource(id) or current_resource < amount:
+		return false
+	current_resource -= amount
+	resource_changed.emit(self, resource_id, current_resource, max_resource)
+	return true
+
+
+func gain_resource(
+	amount: int,
+	id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE,
+) -> int:
+	if amount <= 0 or not has_resource(id):
+		return 0
+	var before := current_resource
+	current_resource = mini(max_resource, current_resource + amount)
+	var gained := current_resource - before
+	if gained > 0:
+		resource_changed.emit(self, resource_id, current_resource, max_resource)
+	return gained
+
+
+func refill_resource(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> void:
+	if not has_resource(id):
+		return
+	if current_resource == max_resource:
+		return
+	current_resource = max_resource
+	resource_changed.emit(self, resource_id, current_resource, max_resource)
 
 
 func emit_death() -> void:

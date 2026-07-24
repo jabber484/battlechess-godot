@@ -10,6 +10,8 @@ extends Resource
 @export var max_hp: int = 100
 @export var max_moves: int = 1
 @export var max_actions: int = 1
+@export var resource_id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE
+@export var max_resource: int = 0
 @export var abilities: Array[AbilityData] = []
 
 
@@ -24,5 +26,7 @@ func to_dict() -> Dictionary:
 		"max_hp": max_hp,
 		"max_moves": max_moves,
 		"max_actions": max_actions,
+		"resource_id": resource_id,
+		"max_resource": max_resource,
 		"abilities": abilities,
 	}

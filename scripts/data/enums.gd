@@ -12,3 +12,5 @@ enum BattleResult { NONE, VICTORY, DEFEAT }
 enum AbilityCategory { MOVE, ACTION }
 
 enum CostSlot { MOVE, ACTION }
+
+enum UnitResource { NONE, STAMINA, MANA, ENERGY }
