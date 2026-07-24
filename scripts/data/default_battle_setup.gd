@@ -4,6 +4,7 @@ extends RefCounted
 const UnitSpawnData := preload("res://scripts/data/unit_spawn.gd")
 const UnitStatsData := preload("res://scripts/data/unit_stats.gd")
 const SimpleMoveAbilityDataScript := preload("res://scripts/abilities/simple_move_ability_data.gd")
+const SimpleAttackAbilityDataScript := preload("res://scripts/abilities/simple_attack_ability_data.gd")
 
 
 static func get_unit_spawns() -> Array[UnitSpawnData]:
@@ -53,7 +54,8 @@ static func _make_stats(
 	stats.accuracy = accuracy
 	stats.damage = damage
 	stats.max_hp = max_hp
-	var move_abilities: Array[AbilityData] = []
-	move_abilities.append(SimpleMoveAbilityDataScript.new())
-	stats.abilities = move_abilities
+	var abilities: Array[AbilityData] = []
+	abilities.append(SimpleMoveAbilityDataScript.new())
+	abilities.append(SimpleAttackAbilityDataScript.new())
+	stats.abilities = abilities
 	return stats

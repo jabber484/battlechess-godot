@@ -26,7 +26,7 @@ func _ready() -> void:
 
 
 func _make_ability_ctx() -> AbilityContext:
-	return AbilityContext.new(pathfinding, grid_system, turn_manager, battle_state)
+	return AbilityContext.new(pathfinding, grid_system, turn_manager, battle_state, combat_system)
 
 
 func set_move_executor(mover: Callable) -> void:
@@ -83,8 +83,24 @@ func run_unit_turn(unit: Unit) -> void:
 	if not turn_manager.owns_turn(unit):
 		return
 
-	var targets := combat_system.get_attackable_units(unit, players)
-	if not targets.is_empty() and turn_manager.can_act(unit):
+	# Refresh ctx after move (occupancy / turn flags may have changed).
+	ctx = _make_ability_ctx()
+	var targets: Array[Unit] = []
+	var target_seen: Dictionary = {}
+	for ability in unit.get_abilities_by_category(BattleEnums.AbilityCategory.ACTION):
+		if not ability.can_activate(unit, ctx):
+			continue
+		for tile in ability.get_target_tiles(unit, ctx):
+			var occupant := grid_system.get_occupant(tile)
+			if occupant == null or not occupant.is_alive():
+				continue
+			if target_seen.has(occupant):
+				continue
+			if unit.resolve_ability(BattleEnums.AbilityCategory.ACTION, tile, ctx) == null:
+				continue
+			target_seen[occupant] = true
+			targets.append(occupant)
+	if not targets.is_empty():
 		targets.sort_custom(func(a: Unit, b: Unit) -> bool:
 			var ca := combat_system.compute_hit_chance(unit, a)
 			var cb := combat_system.compute_hit_chance(unit, b)

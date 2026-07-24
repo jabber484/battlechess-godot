@@ -27,7 +27,9 @@ var _ability_ctx: AbilityContext
 
 func _ready() -> void:
 	randomize()
-	_ability_ctx = AbilityContextScript.new(pathfinding, grid_system, turn_manager, battle_state)
+	_ability_ctx = AbilityContextScript.new(
+		pathfinding, grid_system, turn_manager, battle_state, combat_system
+	)
 	_connect_signals()
 	_units = BattleSpawnerScript.spawn_units(
 		DefaultBattleSetupScript.get_unit_spawns(),
@@ -44,7 +46,7 @@ func _ready() -> void:
 
 func _connect_signals() -> void:
 	ai_system.set_move_executor(_execute_ai_move)
-	ai_system.set_attack_executor(_execute_attack)
+	ai_system.set_attack_executor(_execute_ai_attack)
 	grid_view.tile_picked.connect(_on_tile_picked)
 	turn_manager.round_started.connect(_on_round_started)
 	turn_manager.turn_started.connect(_on_turn_started)
@@ -162,12 +164,17 @@ func _on_tile_picked(grid_pos: Vector2i) -> void:
 
 
 func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
-	if not combat_system.can_attack(attacker, defender):
+	var ability := attacker.resolve_ability(
+		BattleEnums.AbilityCategory.ACTION,
+		defender.grid_pos,
+		_ability_ctx,
+	)
+	if ability == null:
 		battle_ui.set_status("Out of range")
 		return
 	var chance := combat_system.compute_hit_chance(attacker, defender)
 	if _pending_attack_target == defender:
-		_execute_attack(attacker, defender)
+		await _execute_ability(ability, attacker, defender.grid_pos)
 	else:
 		_pending_attack_target = defender
 		camera_rig.focus_on(GridMath.grid_to_world(defender.grid_pos))
@@ -180,6 +187,19 @@ func _execute_ai_move(unit: Unit, to_pos: Vector2i) -> void:
 	if ability == null:
 		return
 	await _execute_ability(ability, unit, to_pos)
+
+
+func _execute_ai_attack(attacker: Unit, defender: Unit) -> void:
+	if defender == null:
+		return
+	var ability := attacker.resolve_ability(
+		BattleEnums.AbilityCategory.ACTION,
+		defender.grid_pos,
+		_ability_ctx,
+	)
+	if ability == null:
+		return
+	await _execute_ability(ability, attacker, defender.grid_pos)
 
 
 func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) -> void:
@@ -220,6 +240,17 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 				_log_color_for(unit),
 			)
 
+	# SimpleAttackAbility: inject camera + commit_attack when present was left empty.
+	var defender = execution.get("defender", null)
+	if ability is SimpleAttackAbilityData and defender is Unit and not present.is_valid():
+		var target: Unit = defender as Unit
+		present = func() -> void:
+			camera_rig.focus_on(GridMath.grid_to_world(target.grid_pos))
+			await get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
+			_ability_ctx.combat_system.commit_attack(unit, target)
+			await get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
+			camera_rig.focus_on(GridMath.grid_to_world(unit.grid_pos))
+
 	grid_view.clear_highlights()
 	var typed_death: Array[Unit] = []
 	for u in death_units:
@@ -227,28 +258,6 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 			typed_death.append(u as Unit)
 
 	await action_runner.run(commit, present, complete, typed_death)
-	_refresh_highlights()
-
-
-func _execute_attack(attacker: Unit, defender: Unit) -> void:
-	if turn_manager.is_busy():
-		return
-	if not combat_system.can_attack(attacker, defender):
-		return
-	grid_view.clear_highlights()
-
-	await action_runner.run(
-		Callable(),
-		func() -> void:
-			camera_rig.focus_on(GridMath.grid_to_world(defender.grid_pos))
-			await get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
-			combat_system.commit_attack(attacker, defender)
-			await get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
-			camera_rig.focus_on(GridMath.grid_to_world(attacker.grid_pos)),
-		func() -> void:
-			turn_manager.notify_acted(attacker),
-		[attacker, defender],
-	)
 	_refresh_highlights()
 
 
@@ -267,19 +276,30 @@ func _refresh_highlights() -> void:
 	if active == null or not active.is_player() or battle_state.is_over():
 		return
 	var move_tiles: Array[Vector2i] = []
-	var seen: Dictionary = {}
+	var move_seen: Dictionary = {}
 	for ability in active.get_abilities_by_category(BattleEnums.AbilityCategory.MOVE):
 		if not ability.can_activate(active, _ability_ctx):
 			continue
 		for tile in ability.get_target_tiles(active, _ability_ctx):
-			if seen.has(tile):
+			if move_seen.has(tile):
 				continue
-			seen[tile] = true
+			move_seen[tile] = true
 			move_tiles.append(tile)
 	if not move_tiles.is_empty():
 		grid_view.show_reachable(move_tiles)
-	if turn_manager.can_act(active):
-		grid_view.show_attackable(combat_system.get_attackable_tiles(active, battle_state.get_living_enemies()))
+
+	var attack_tiles: Array[Vector2i] = []
+	var attack_seen: Dictionary = {}
+	for ability in active.get_abilities_by_category(BattleEnums.AbilityCategory.ACTION):
+		if not ability.can_activate(active, _ability_ctx):
+			continue
+		for tile in ability.get_target_tiles(active, _ability_ctx):
+			if attack_seen.has(tile):
+				continue
+			attack_seen[tile] = true
+			attack_tiles.append(tile)
+	if not attack_tiles.is_empty():
+		grid_view.show_attackable(attack_tiles)
 
 
 func _log_color_for(unit: Unit) -> Color:
