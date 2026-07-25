@@ -145,38 +145,41 @@ func _build_visuals() -> void:
 			floor_mesh.material_override = mat
 			add_child(floor_mesh)
 			_tile_meshes[pos] = floor_mesh
-			if tile.cover != BattleEnums.Cover.NONE:
-				_spawn_cover(pos, tile.cover)
+			if tile.has_any_cover():
+				_spawn_cover(pos, tile)
 
 
-func _spawn_cover(grid_pos: Vector2i, cover: BattleEnums.Cover) -> void:
-	var h := 0.55 if cover == BattleEnums.Cover.HALF else 1.1
+func _spawn_cover(grid_pos: Vector2i, tile: BattleTile) -> void:
 	var thickness := 0.06
 	var width := 0.92
-	var center := GridMath.grid_to_world(grid_pos, h * 0.5 + 0.05)
-	var color := HALF_COVER_COLOR if cover == BattleEnums.Cover.HALF else FULL_COVER_COLOR
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-
 	var root := Node3D.new()
 	root.name = "Cover_%d_%d" % [grid_pos.x, grid_pos.y]
-	root.position = center
+	root.position = GridMath.grid_to_world(grid_pos, 0.0)
 	add_child(root)
 
-	# Four thin wall planes around the tile edge (N/S/E/W).
-	var walls: Array[Dictionary] = [
-		{"size": Vector3(width, h, thickness), "offset": Vector3(0.0, 0.0, -0.46)},
-		{"size": Vector3(width, h, thickness), "offset": Vector3(0.0, 0.0, 0.46)},
-		{"size": Vector3(thickness, h, width), "offset": Vector3(-0.46, 0.0, 0.0)},
-		{"size": Vector3(thickness, h, width), "offset": Vector3(0.46, 0.0, 0.0)},
-	]
-	for wall in walls:
+	# Thin wall planes on edges that provide cover (N/E/S/W).
+	var wall_by_dir: Dictionary = {
+		BattleEnums.Direction.NORTH: {"size": Vector3(width, 1.0, thickness), "offset": Vector3(0.0, 0.0, -0.46)},
+		BattleEnums.Direction.SOUTH: {"size": Vector3(width, 1.0, thickness), "offset": Vector3(0.0, 0.0, 0.46)},
+		BattleEnums.Direction.WEST: {"size": Vector3(thickness, 1.0, width), "offset": Vector3(-0.46, 0.0, 0.0)},
+		BattleEnums.Direction.EAST: {"size": Vector3(thickness, 1.0, width), "offset": Vector3(0.46, 0.0, 0.0)},
+	}
+	for dir in tile.edge_cover.keys():
+		var cover: BattleEnums.Cover = tile.edge_cover[dir]
+		if cover == BattleEnums.Cover.NONE:
+			continue
+		var wall: Dictionary = wall_by_dir[dir]
+		var h := 0.55 if cover == BattleEnums.Cover.HALF else 1.1
 		var mesh := MeshInstance3D.new()
 		var box := BoxMesh.new()
-		box.size = wall["size"]
+		var size: Vector3 = wall["size"]
+		box.size = Vector3(size.x, h, size.z)
 		mesh.mesh = box
-		mesh.position = wall["offset"]
+		var offset: Vector3 = wall["offset"]
+		mesh.position = offset + Vector3(0.0, h * 0.5 + 0.05, 0.0)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = HALF_COVER_COLOR if cover == BattleEnums.Cover.HALF else FULL_COVER_COLOR
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		mesh.material_override = mat
 		root.add_child(mesh)
 

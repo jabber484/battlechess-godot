@@ -233,16 +233,14 @@ func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
 	if not ability.is_valid_target(attacker, defender.grid_pos, _ability_ctx):
 		battle_ui.set_status("Out of range")
 		return
-	var distance_penalty_per_tile := _distance_penalty_per_tile(ability)
-	var chance := combat_system.compute_hit_chance(
-		attacker, defender, distance_penalty_per_tile
-	)
 	if _pending_attack_target == defender:
 		await _execute_ability(ability, attacker, defender.grid_pos)
 	else:
 		_pending_attack_target = defender
 		_presenter.focus_unit(defender)
-		battle_ui.set_hit_chance("Hit chance: %d%% — click again to confirm" % chance)
+		battle_ui.set_hit_chance(
+			"%s — click again to confirm" % _hit_chance_text(attacker, defender, ability)
+		)
 		battle_ui.set_status("Targeting %s" % defender.display_name)
 
 
@@ -345,20 +343,54 @@ func _refresh_highlights() -> void:
 	grid_view.clear_highlights()
 	var active := turn_manager.active_unit
 	if active == null or not active.is_player() or battle_state.is_over():
+		battle_ui.set_hit_chance("")
 		return
 	if _selected_ability == null or not _selected_ability.can_activate(active, _ability_ctx):
+		battle_ui.set_hit_chance("")
 		return
 	var tiles := _selected_ability.get_target_tiles(active, _ability_ctx)
 	if tiles.is_empty():
+		battle_ui.set_hit_chance("")
 		return
 	match _selected_ability.category:
 		BattleEnums.AbilityCategory.MOVE:
+			battle_ui.set_hit_chance("")
 			grid_view.show_reachable(tiles)
 			_refresh_move_hover_preview(active)
 		BattleEnums.AbilityCategory.ACTION:
 			grid_view.show_attackable(tiles)
+			_refresh_attack_hover_preview(active)
 		_:
 			grid_view.show_attackable(tiles)
+			_refresh_attack_hover_preview(active)
+
+
+func _refresh_attack_hover_preview(unit: Unit) -> void:
+	if unit == null or _selected_ability == null:
+		battle_ui.set_hit_chance("")
+		return
+	if not GridMath.is_in_bounds(_hovered_tile):
+		battle_ui.set_hit_chance("")
+		return
+	if not _selected_ability.is_valid_target(unit, _hovered_tile, _ability_ctx):
+		battle_ui.set_hit_chance("")
+		return
+	var defender := grid_system.get_occupant(_hovered_tile)
+	if defender == null or not defender.is_enemy():
+		battle_ui.set_hit_chance("")
+		return
+	grid_view.show_hover(_hovered_tile)
+	var text := _hit_chance_text(unit, defender, _selected_ability)
+	if _pending_attack_target == defender:
+		text = "%s — click again to confirm" % text
+	battle_ui.set_hit_chance(text)
+
+
+func _hit_chance_text(attacker: Unit, defender: Unit, ability: AbilityData) -> String:
+	var breakdown := combat_system.explain_hit_chance(
+		attacker, defender, _distance_penalty_per_tile(ability)
+	)
+	return combat_system.format_hit_chance(breakdown)
 
 
 func _refresh_move_hover_preview(unit: Unit) -> void:

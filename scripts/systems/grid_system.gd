@@ -5,17 +5,18 @@ signal tile_clicked(grid_pos: Vector2i)
 signal occupancy_changed(grid_pos: Vector2i)
 
 var tiles: Dictionary = {} # Vector2i -> BattleTile
+## Each entry: pos, cover level, dirs (cardinal edges that provide that cover).
 var _cover_layout: Array[Dictionary] = [
-	{"pos": Vector2i(3, 3), "cover": BattleEnums.Cover.HALF},
-	{"pos": Vector2i(4, 3), "cover": BattleEnums.Cover.HALF},
-	{"pos": Vector2i(7, 3), "cover": BattleEnums.Cover.FULL},
-	{"pos": Vector2i(8, 4), "cover": BattleEnums.Cover.HALF},
-	{"pos": Vector2i(3, 8), "cover": BattleEnums.Cover.FULL},
-	{"pos": Vector2i(4, 8), "cover": BattleEnums.Cover.HALF},
-	{"pos": Vector2i(6, 6), "cover": BattleEnums.Cover.HALF},
-	{"pos": Vector2i(7, 7), "cover": BattleEnums.Cover.FULL},
-	{"pos": Vector2i(5, 5), "cover": BattleEnums.Cover.HALF},
-	{"pos": Vector2i(8, 8), "cover": BattleEnums.Cover.HALF},
+	{"pos": Vector2i(3, 3), "cover": BattleEnums.Cover.HALF, "dirs": [BattleEnums.Direction.SOUTH, BattleEnums.Direction.EAST]},
+	{"pos": Vector2i(4, 3), "cover": BattleEnums.Cover.HALF, "dirs": [BattleEnums.Direction.SOUTH, BattleEnums.Direction.WEST]},
+	{"pos": Vector2i(7, 3), "cover": BattleEnums.Cover.FULL, "dirs": [BattleEnums.Direction.SOUTH, BattleEnums.Direction.EAST]},
+	{"pos": Vector2i(8, 4), "cover": BattleEnums.Cover.HALF, "dirs": [BattleEnums.Direction.NORTH, BattleEnums.Direction.WEST]},
+	{"pos": Vector2i(3, 8), "cover": BattleEnums.Cover.FULL, "dirs": [BattleEnums.Direction.NORTH, BattleEnums.Direction.EAST]},
+	{"pos": Vector2i(4, 8), "cover": BattleEnums.Cover.HALF, "dirs": [BattleEnums.Direction.NORTH, BattleEnums.Direction.WEST]},
+	{"pos": Vector2i(6, 6), "cover": BattleEnums.Cover.HALF, "dirs": [BattleEnums.Direction.SOUTH, BattleEnums.Direction.EAST]},
+	{"pos": Vector2i(7, 7), "cover": BattleEnums.Cover.FULL, "dirs": [BattleEnums.Direction.NORTH, BattleEnums.Direction.WEST]},
+	{"pos": Vector2i(5, 5), "cover": BattleEnums.Cover.HALF, "dirs": BattleEnums.ALL_DIRECTIONS},
+	{"pos": Vector2i(8, 8), "cover": BattleEnums.Cover.HALF, "dirs": BattleEnums.ALL_DIRECTIONS},
 ]
 
 
@@ -39,8 +40,10 @@ func _build_tiles() -> void:
 			tiles[pos] = tile
 	for entry in _cover_layout:
 		var tile: BattleTile = tiles[entry["pos"]]
-		tile.cover = entry["cover"]
-		tile.walkable = false
+		var cover: BattleEnums.Cover = entry["cover"]
+		var dirs: Array = entry.get("dirs", BattleEnums.ALL_DIRECTIONS)
+		for dir in dirs:
+			tile.set_edge_cover(dir as BattleEnums.Direction, cover)
 
 
 func get_tile(grid_pos: Vector2i) -> BattleTile:
@@ -61,14 +64,20 @@ func can_stand(grid_pos: Vector2i, ignore_unit: Unit = null) -> bool:
 	return ignore_unit != null and tile.occupant == ignore_unit
 
 
-func get_cover(grid_pos: Vector2i) -> BattleEnums.Cover:
+func get_edge_cover(grid_pos: Vector2i, dir: BattleEnums.Direction) -> BattleEnums.Cover:
 	var tile := get_tile(grid_pos)
 	if tile == null:
 		return BattleEnums.Cover.NONE
-	return tile.cover
+	return tile.get_edge_cover(dir)
 
 
-## Cover on tiles adjacent to the defender, only toward the attacker.
+func get_edge_cover_vec(grid_pos: Vector2i, edge: Vector2i) -> BattleEnums.Cover:
+	if absi(edge.x) + absi(edge.y) != 1:
+		return BattleEnums.Cover.NONE
+	return get_edge_cover(grid_pos, BattleEnums.vector_to_direction(edge))
+
+
+## Cover from the defender's edges and adjacent cover edges toward the attacker.
 func get_directional_cover(defender_pos: Vector2i, attacker_pos: Vector2i) -> BattleEnums.Cover:
 	var dx := signi(attacker_pos.x - defender_pos.x)
 	var dy := signi(attacker_pos.y - defender_pos.y)
@@ -76,11 +85,17 @@ func get_directional_cover(defender_pos: Vector2i, attacker_pos: Vector2i) -> Ba
 		return BattleEnums.Cover.NONE
 	var best: BattleEnums.Cover = BattleEnums.Cover.NONE
 	if dx != 0:
-		best = _max_cover(best, get_cover(defender_pos + Vector2i(dx, 0)))
+		var ox := Vector2i(dx, 0)
+		best = _max_cover(best, get_edge_cover_vec(defender_pos, ox))
+		best = _max_cover(best, get_edge_cover_vec(defender_pos + ox, -ox))
 	if dy != 0:
-		best = _max_cover(best, get_cover(defender_pos + Vector2i(0, dy)))
+		var oy := Vector2i(0, dy)
+		best = _max_cover(best, get_edge_cover_vec(defender_pos, oy))
+		best = _max_cover(best, get_edge_cover_vec(defender_pos + oy, -oy))
 	if dx != 0 and dy != 0:
-		best = _max_cover(best, get_cover(defender_pos + Vector2i(dx, dy)))
+		var diag := defender_pos + Vector2i(dx, dy)
+		best = _max_cover(best, get_edge_cover_vec(diag, Vector2i(-dx, 0)))
+		best = _max_cover(best, get_edge_cover_vec(diag, Vector2i(0, -dy)))
 	return best
 
 

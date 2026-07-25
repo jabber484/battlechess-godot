@@ -2,7 +2,7 @@ class_name SimpleAttackAbilityData
 extends AbilityData
 
 @export var attack_range: int = 5
-## Hit-chance reduction per tile of range. 0 = no distance falloff.
+## Hit-chance reduction per tile beyond adjacent (distance uses N-1). 0 = no falloff.
 @export var distance_penalty_per_tile: int = 5
 
 

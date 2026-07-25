@@ -42,10 +42,58 @@ func compute_hit_chance(
 	defender: Unit,
 	distance_penalty_per_tile: int = 0,
 ) -> int:
+	return int(explain_hit_chance(attacker, defender, distance_penalty_per_tile)["chance"])
+
+
+## Accuracy, distance, and cover terms that feed `compute_hit_chance`.
+func explain_hit_chance(
+	attacker: Unit,
+	defender: Unit,
+	distance_penalty_per_tile: int = 0,
+) -> Dictionary:
 	var distance := GridMath.chebyshev(attacker.grid_pos, defender.grid_pos)
-	var distance_penalty := distance * distance_penalty_per_tile
-	var cover_penalty := cover_penalty_between(attacker.grid_pos, defender.grid_pos)
-	return clampi(attacker.accuracy - distance_penalty - cover_penalty, 5, 100)
+	## Falloff starts after adjacent (distance 1): penalty uses (N - 1) tiles.
+	var distance_steps := maxi(0, distance - 1)
+	var distance_penalty := distance_steps * distance_penalty_per_tile
+	var cover: BattleEnums.Cover = grid_system.get_directional_cover(
+		defender.grid_pos, attacker.grid_pos
+	)
+	var cover_penalty := _penalty_for_cover(cover)
+	var raw := attacker.accuracy - distance_penalty - cover_penalty
+	return {
+		"chance": clampi(raw, 5, 100),
+		"accuracy": attacker.accuracy,
+		"distance": distance,
+		"distance_steps": distance_steps,
+		"distance_penalty": distance_penalty,
+		"distance_penalty_per_tile": distance_penalty_per_tile,
+		"cover": cover,
+		"cover_penalty": cover_penalty,
+	}
+
+
+func format_hit_chance(breakdown: Dictionary) -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	parts.append("%d base" % int(breakdown["accuracy"]))
+	var distance_penalty: int = int(breakdown["distance_penalty"])
+	if distance_penalty > 0:
+		parts.append(
+			"−%d dist (%d×%d)"
+			% [
+				distance_penalty,
+				int(breakdown["distance_steps"]),
+				int(breakdown["distance_penalty_per_tile"]),
+			]
+		)
+	var cover_penalty: int = int(breakdown["cover_penalty"])
+	if cover_penalty > 0:
+		var cover_name := (
+			"full cover"
+			if breakdown["cover"] == BattleEnums.Cover.FULL
+			else "half cover"
+		)
+		parts.append("−%d %s" % [cover_penalty, cover_name])
+	return "Hit %d%%: %s" % [int(breakdown["chance"]), " ".join(parts)]
 
 
 func cover_penalty_between(attacker_pos: Vector2i, defender_pos: Vector2i) -> int:

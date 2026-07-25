@@ -145,7 +145,7 @@ func _score_tile(unit: Unit, tile: Vector2i, players: Array[Unit]) -> int:
 				pass
 		if dist <= max_range:
 			can_shoot_from_here = true
-			var distance_penalty := dist * distance_penalty_per_tile
+			var distance_penalty := maxi(0, dist - 1) * distance_penalty_per_tile
 			var cover_penalty: int = combat_system.cover_penalty_between(tile, player.grid_pos)
 			var chance := clampi(unit.accuracy - distance_penalty - cover_penalty, 5, 100)
 			score += 40 + chance / 2
