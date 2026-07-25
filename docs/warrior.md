@@ -13,7 +13,26 @@ The Warrior closes distance, hits hard up close, and survives by spending a shar
 | Pillar         | Intent                                                    |
 | -------------- | --------------------------------------------------------- |
 | Melee identity | Only fights adjacent (Chebyshev range 1, diagonals count) |
-| Shared battery | Stamina powers attacks *and* soaks damage                 |
+| Shared battery | Stamina powers attacks _and_ soaks damage                 |
+
+### Baseline advantages
+
+| Advantage                | Why it matters                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| Strong melee damage      | Highest default damage in the prototype roster — wins trades once adjacent                       |
+| Better-than-average move | Mid move band — can close gaps that pure short-legs melee cannot                                 |
+| Mid speed                | Acts in the middle of the round — neither stranded last nor forced to commit first               |
+| Better-than-average HP   | Slight bulk buffer after mistakes, without replacing stamina as the real sustain                 |
+| Stamina shield           | Incoming damage can be soaked 1:1 while stamina lasts — frontline without being a pure HP sponge |
+| Reliable adjacent hits   | At range 1, no distance falloff; fights are about position and cover, not random miss            |
+
+### Baseline disadvantages
+
+| Disadvantage                          | Why it matters                                                                                                                      |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Cannot melee full cover** _(early)_ | Directional full cover is a hard block — must flank, wait, or leave the target to allies. First big melee limitation players learn. |
+| Melee-only reach                      | Attack range Low — useless until adjacent; kiting and chokepoints hurt                                                              |
+| No ranged option                      | Cannot punish full-cover campers or backline without repositioning                                                                  |
 
 ---
 
@@ -48,15 +67,15 @@ UnitStats
 
 From `DefaultBattleSetup._make_warrior_stats()`:
 
-| Stat                | Value      | Notes                                                  |
-| ------------------- | ---------- | ------------------------------------------------------ |
-| Speed               | 5          | Mid initiative (between Sniper 3 and Scout 8)          |
-| Move range          | 4          | Better than average — closes gaps into melee           |
-| Accuracy            | 100        | Deterministic hits before cover/falloff                |
-| Damage              | 30         | Highest default damage in the prototype roster         |
-| Max HP              | 110        | Better than average — not enough to ignore stamina     |
-| Resource            | Stamina 50 | Starts full                                            |
-| Move/action budgets | 1 / 1      | Same as other units                                    |
+| Stat                | Value      | Notes                                              |
+| ------------------- | ---------- | -------------------------------------------------- |
+| Speed               | 5          | Mid initiative (between Sniper 3 and Scout 8)      |
+| Move range          | 4          | Better than average — closes gaps into melee       |
+| Accuracy            | 100        | Deterministic hits before cover/falloff            |
+| Damage              | 30         | Highest default damage in the prototype roster     |
+| Max HP              | 110        | Better than average — not enough to ignore stamina |
+| Resource            | Stamina 50 | Starts full                                        |
+| Move/action budgets | 1 / 1      | Same as other units                                |
 
 Compared to generic shooters (Scout etc.): mid speed, stronger mobility than most, better-than-average HP, higher damage, melee-only attack, plus the stamina kit. Stamina — not raw HP — is the real sustain.
 
@@ -68,17 +87,17 @@ Stamina is a single pool (`BattleEnums.UnitResource.STAMINA`).
 
 ### Spends
 
-| Event                | Cost                     | Source                                    |
-| -------------------- | ------------------------ | ----------------------------------------- |
+| Event                | Cost                     | Source                                       |
+| -------------------- | ------------------------ | -------------------------------------------- |
 | Melee attack         | **10**                   | `WarriorBasicAttackAbilityData.stamina_cost` |
-| Incoming damage soak | **1 per 1 HP prevented** | `WarriorStaminaShieldAbilityData`         |
+| Incoming damage soak | **1 per 1 HP prevented** | `WarriorStaminaShieldAbilityData`            |
 
 ### Gains
 
-| Event            | Amount                    | Source                                              |
-| ---------------- | ------------------------- | --------------------------------------------------- |
-| Own turn starts  | **+10** (capped at max)   | `WarriorStaminaRechargeAbilityData.recharge_amount` |
-| Battle start     | Full (`max_resource`)     | `Unit.setup`                                        |
+| Event           | Amount                  | Source                                              |
+| --------------- | ----------------------- | --------------------------------------------------- |
+| Own turn starts | **+10** (capped at max) | `WarriorStaminaRechargeAbilityData.recharge_amount` |
+| Battle start    | Full (`max_resource`)   | `Unit.setup`                                        |
 
 ### Soft caps & feel
 
@@ -104,10 +123,11 @@ Shared move ability. Uses pathfinding + Chebyshev neighbors. Costs the **move** 
 | Category / cost slot | `ACTION` / `ACTION`                                              |
 | `attack_range`       | **1** (adjacent including diagonal)                              |
 | Stamina gate         | `current_stamina >= stamina_cost` (default 10)                   |
+| Full cover           | **Cannot** target enemies with directional full cover vs warrior |
 | Distance falloff     | Inherited; at range 1, **(N−1)×rate = 0** so no distance penalty |
 | Commit               | Spend stamina, then normal attack present/resolve                |
 
-`can_activate` requires: action available, stamina, and at least one living enemy in range.
+`can_activate` requires: action available, stamina, and at least one living enemy in range that is not in full cover. Half cover is still a valid melee target (hit chance reduced as usual).
 
 ### Stamina Shield — `warrior_stamina_shield` (passive)
 
@@ -130,7 +150,8 @@ On the unit’s turn start (`Unit.notify_turn_started` → `on_turn_started`): g
 
 - Range and adjacency use **Chebyshev** (see project grid rule): diagonals are distance 1.
 - Warrior wants to stand next to targets; shooting units want space and cover.
-- Cover still reduces *hit chance* against the Warrior; once a hit lands, stamina/HP absorb it — cover does not reduce damage.
+- Enemies in **full cover** from the Warrior’s approach are untargetable in melee — flank or wait them out.
+- Half/full cover still reduces _hit chance_ on valid shots against the Warrior; once a hit lands, stamina/HP absorb it — cover does not reduce damage.
 
 Typical loop:
 

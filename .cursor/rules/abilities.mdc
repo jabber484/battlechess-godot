@@ -43,7 +43,7 @@ Standard abilities:
 
 - Walk: `SimpleMoveAbilityData` (`id = &"simple_move"`)
 - Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`)
-- Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost, extends simple attack
+- Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost, extends simple attack; cannot target directional full cover
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
 

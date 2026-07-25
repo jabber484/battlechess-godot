@@ -18,6 +18,29 @@ func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
 	return unit.get_resource(BattleEnums.UnitResource.STAMINA) >= stamina_cost
 
 
+func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for pos in super.get_target_tiles(unit, ctx):
+		if not _has_full_cover_against(unit, pos, ctx):
+			result.append(pos)
+	return result
+
+
+func is_valid_target(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> bool:
+	if not super.is_valid_target(unit, target_pos, ctx):
+		return false
+	return not _has_full_cover_against(unit, target_pos, ctx)
+
+
+func _has_full_cover_against(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> bool:
+	if unit == null or ctx == null or ctx.grid_system == null:
+		return false
+	return (
+		ctx.grid_system.get_directional_cover(target_pos, unit.grid_pos)
+		== BattleEnums.Cover.FULL
+	)
+
+
 func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> Dictionary:
 	var execution := super.build_execution(unit, target_pos, ctx)
 	if execution.get("defender", null) == null:
