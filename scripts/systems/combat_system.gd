@@ -18,21 +18,36 @@ func _ready() -> void:
 	turn_manager = get_node(turn_manager_path) as TurnManager
 
 
-func can_attack(attacker: Unit, defender: Unit, max_range: int) -> bool:
-	return _validate_attack(attacker, defender, false, max_range)
+func can_attack(
+	attacker: Unit,
+	defender: Unit,
+	max_range: int,
+	use_chebyshev: bool = false,
+) -> bool:
+	return _validate_attack(attacker, defender, false, max_range, use_chebyshev)
 
 
-func get_attackable_units(attacker: Unit, units: Array[Unit], max_range: int) -> Array[Unit]:
+func get_attackable_units(
+	attacker: Unit,
+	units: Array[Unit],
+	max_range: int,
+	use_chebyshev: bool = false,
+) -> Array[Unit]:
 	var result: Array[Unit] = []
 	for unit in units:
-		if can_attack(attacker, unit, max_range):
+		if can_attack(attacker, unit, max_range, use_chebyshev):
 			result.append(unit)
 	return result
 
 
-func get_attackable_tiles(attacker: Unit, units: Array[Unit], max_range: int) -> Array[Vector2i]:
+func get_attackable_tiles(
+	attacker: Unit,
+	units: Array[Unit],
+	max_range: int,
+	use_chebyshev: bool = false,
+) -> Array[Vector2i]:
 	var tiles: Array[Vector2i] = []
-	for unit in get_attackable_units(attacker, units, max_range):
+	for unit in get_attackable_units(attacker, units, max_range, use_chebyshev):
 		tiles.append(unit.grid_pos)
 	return tiles
 
@@ -41,8 +56,9 @@ func compute_hit_chance(
 	attacker: Unit,
 	defender: Unit,
 	distance_penalty_per_tile: int = 0,
+	use_chebyshev: bool = false,
 ) -> int:
-	var distance := GridMath.manhattan(attacker.grid_pos, defender.grid_pos)
+	var distance := _tile_distance(attacker.grid_pos, defender.grid_pos, use_chebyshev)
 	var distance_penalty := distance * distance_penalty_per_tile
 	var cover_penalty := _cover_penalty(defender.grid_pos)
 	return clampi(attacker.accuracy - distance_penalty - cover_penalty, 5, 100)
@@ -53,15 +69,17 @@ func commit_attack(
 	defender: Unit,
 	distance_penalty_per_tile: int,
 	max_range: int,
+	use_chebyshev: bool = false,
 ) -> Dictionary:
+	## use_chebyshev: true = Chebyshev range (diagonals count); false = Manhattan.
 	var result := {
 		"hit": false,
 		"damage": 0,
 		"hit_chance": 0,
 	}
-	if not _validate_attack(attacker, defender, true, max_range):
+	if not _validate_attack(attacker, defender, true, max_range, use_chebyshev):
 		return result
-	var chance := compute_hit_chance(attacker, defender, distance_penalty_per_tile)
+	var chance := compute_hit_chance(attacker, defender, distance_penalty_per_tile, use_chebyshev)
 	result["hit_chance"] = chance
 	var roll := randi_range(1, 100)
 	var hit := roll <= chance
@@ -78,6 +96,7 @@ func _validate_attack(
 	defender: Unit,
 	for_commit: bool,
 	max_range: int,
+	use_chebyshev: bool,
 ) -> bool:
 	if attacker == null or defender == null:
 		return false
@@ -91,7 +110,13 @@ func _validate_attack(
 				return false
 		elif not turn_manager.can_act(attacker):
 			return false
-	return GridMath.manhattan(attacker.grid_pos, defender.grid_pos) <= max_range
+	return _tile_distance(attacker.grid_pos, defender.grid_pos, use_chebyshev) <= max_range
+
+
+func _tile_distance(a: Vector2i, b: Vector2i, use_chebyshev: bool) -> int:
+	if use_chebyshev:
+		return GridMath.chebyshev(a, b)
+	return GridMath.manhattan(a, b)
 
 
 func _cover_penalty(grid_pos: Vector2i) -> int:

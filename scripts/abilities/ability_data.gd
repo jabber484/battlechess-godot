@@ -49,3 +49,8 @@ func build_execution(
 ## Passive hook: mutate DamageContext before HP is applied.
 func on_incoming_damage(_unit: Unit, _context) -> void:
 	pass
+
+
+## Passive hook: called when this unit's turn begins.
+func on_turn_started(_unit: Unit) -> void:
+	pass

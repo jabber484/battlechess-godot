@@ -11,4 +11,4 @@ alwaysApply: false
 - Units should start at **100% accuracy** by default.
 - Without other factors (distance, cover, status, etc.), attacks are **deterministic** (always hit).
 - Miss chance comes only from situational modifiers (and ability-specific falloff), not from a base accuracy deficit.
-- Attack `attack_range` and distance falloff (`distance_penalty_per_tile`) live on the attack ability, not the unit.
+- Attack `attack_range`, distance falloff (`distance_penalty_per_tile`), and `use_chebyshev` live on the attack ability, not the unit.

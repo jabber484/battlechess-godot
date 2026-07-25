@@ -5,11 +5,12 @@ const BattleSpawnerScript := preload("res://scripts/battle/battle_spawner.gd")
 const BattlePresenterScript := preload("res://scripts/battle/battle_presenter.gd")
 const DefaultBattleSetupScript := preload("res://scripts/data/default_battle_setup.gd")
 const AbilityContextScript := preload("res://scripts/abilities/ability_context.gd")
+const CombatSystemScript := preload("res://scripts/systems/combat_system.gd")
 
 @onready var grid_system: GridSystem = $Systems/GridSystem
 @onready var pathfinding: PathfindingSystem = $Systems/PathfindingSystem
 @onready var turn_manager: TurnManager = $Systems/TurnManager
-@onready var combat_system: CombatSystem = $Systems/CombatSystem
+@onready var combat_system: CombatSystemScript = $Systems/CombatSystem
 @onready var action_runner: ActionRunner = $Systems/ActionRunner
 @onready var ai_system: AISystem = $Systems/AISystem
 @onready var battle_state: BattleState = $Systems/BattleState
@@ -20,8 +21,9 @@ const AbilityContextScript := preload("res://scripts/abilities/ability_context.g
 
 var _units: Array[Unit] = []
 var _pending_attack_target: Unit = null
+var _selected_ability: AbilityData = null
 var _ability_ctx: AbilityContext
-var _presenter: BattlePresenter
+var _presenter: BattlePresenterScript
 
 
 func _ready() -> void:
@@ -38,6 +40,7 @@ func _ready() -> void:
 	)
 	for unit in _units:
 		unit.hp_changed.connect(_on_unit_hp_changed)
+		unit.resource_changed.connect(_on_unit_resource_changed)
 	battle_state.register_units(_units)
 	turn_manager.register_units(_units)
 	turn_manager.start_battle()
@@ -56,6 +59,7 @@ func _connect_signals() -> void:
 	combat_system.attack_resolved.connect(_on_attack_resolved)
 	battle_state.battle_ended.connect(_on_battle_ended)
 	battle_ui.end_turn_pressed.connect(_on_end_turn_pressed)
+	battle_ui.ability_selected.connect(_on_ability_selected)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -71,10 +75,14 @@ func _on_round_started(round_number: int) -> void:
 
 func _on_turn_started(unit: Unit) -> void:
 	_pending_attack_target = null
+	_selected_ability = null
+	if unit:
+		unit.notify_turn_started()
 	battle_ui.set_active_unit(unit)
 	battle_ui.set_hit_chance("")
 	battle_ui.set_end_turn_enabled(unit.is_player())
 	_presenter.focus_unit(unit)
+	_refresh_ability_bar()
 	_refresh_highlights()
 	var team_tag := "Player" if unit.is_player() else "Enemy"
 	battle_ui.append_log("[%s] %s's turn" % [team_tag, unit.display_name], _log_color_for(unit))
@@ -82,15 +90,17 @@ func _on_turn_started(unit: Unit) -> void:
 		battle_ui.set_status("Enemy turn: %s" % unit.display_name)
 		ai_system.run_unit_turn(unit)
 	else:
-		battle_ui.set_status("Your turn: %s — click move or enemy" % unit.display_name)
+		battle_ui.set_status("Your turn: %s — select an ability" % unit.display_name)
 
 
 func _on_turn_ended(unit: Unit) -> void:
 	if unit:
 		battle_ui.append_log("%s ended turn" % unit.display_name, _log_color_for(unit))
+	_selected_ability = null
+	_pending_attack_target = null
+	battle_ui.clear_abilities()
 	grid_view.clear_highlights()
 	battle_ui.set_hit_chance("")
-	_pending_attack_target = null
 
 
 func _on_queue_changed(queue: Array) -> void:
@@ -100,12 +110,24 @@ func _on_queue_changed(queue: Array) -> void:
 func _on_unit_flags_changed(unit: Unit) -> void:
 	if unit == turn_manager.active_unit:
 		battle_ui.set_active_unit(unit)
+		_refresh_ability_bar()
 		_refresh_highlights()
 
 
 func _on_unit_hp_changed(unit: Unit, _hp: int, _max_hp: int) -> void:
 	if unit == turn_manager.active_unit:
 		battle_ui.set_active_unit(unit)
+
+
+func _on_unit_resource_changed(
+	unit: Unit,
+	_resource_id: BattleEnums.UnitResource,
+	_current: int,
+	_max_resource: int,
+) -> void:
+	if unit == turn_manager.active_unit and unit.is_player():
+		_refresh_ability_bar()
+		_refresh_highlights()
 
 
 func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int, hit_chance: int) -> void:
@@ -129,6 +151,8 @@ func _on_battle_ended(result: BattleEnums.BattleResult) -> void:
 			battle_ui.append_log("VICTORY!", Color(0.4, 1.0, 0.5))
 		BattleEnums.BattleResult.DEFEAT:
 			battle_ui.append_log("DEFEAT!", Color(1.0, 0.4, 0.4))
+	_selected_ability = null
+	battle_ui.clear_abilities()
 	battle_ui.set_end_turn_enabled(false)
 	grid_view.clear_highlights()
 
@@ -138,42 +162,71 @@ func _on_end_turn_pressed() -> void:
 		turn_manager.request_end_turn()
 
 
+func _on_ability_selected(ability: AbilityData) -> void:
+	if battle_state.is_over() or turn_manager.is_busy():
+		return
+	var active := turn_manager.active_unit
+	if active == null or not active.is_player() or ability == null:
+		return
+	if not ability.can_activate(active, _ability_ctx):
+		battle_ui.set_status("%s is not available" % ability.display_name)
+		_refresh_ability_bar()
+		return
+	_selected_ability = ability
+	_pending_attack_target = null
+	battle_ui.set_hit_chance("")
+	battle_ui.set_selected_ability(_selected_ability)
+	_refresh_highlights()
+	match ability.category:
+		BattleEnums.AbilityCategory.MOVE:
+			battle_ui.set_status("Selected %s — click a highlighted tile" % ability.display_name)
+		BattleEnums.AbilityCategory.ACTION:
+			battle_ui.set_status("Selected %s — click a target" % ability.display_name)
+		_:
+			battle_ui.set_status("Selected %s" % ability.display_name)
+
+
 func _on_tile_picked(grid_pos: Vector2i) -> void:
 	if battle_state.is_over() or turn_manager.is_busy():
 		return
 	var active := turn_manager.active_unit
 	if active == null or not active.is_player():
 		return
-
-	var occupant := grid_system.get_occupant(grid_pos)
-	if occupant and occupant.is_enemy():
-		_handle_attack_click(active, occupant)
+	if _selected_ability == null:
+		battle_ui.set_status("Select an ability first")
+		return
+	if not _selected_ability.can_activate(active, _ability_ctx):
+		_clear_selected_ability()
+		battle_ui.set_status("Ability no longer available — select another")
 		return
 
-	var move_ability := active.resolve_ability(
-		BattleEnums.AbilityCategory.MOVE,
-		grid_pos,
-		_ability_ctx,
-	)
-	if move_ability:
-		await _execute_ability(move_ability, active, grid_pos)
+	if _selected_ability.category == BattleEnums.AbilityCategory.ACTION:
+		var occupant := grid_system.get_occupant(grid_pos)
+		if occupant and occupant.is_enemy():
+			await _handle_attack_click(active, occupant)
+			return
+
+	if not _selected_ability.is_valid_target(active, grid_pos, _ability_ctx):
+		_pending_attack_target = null
+		battle_ui.set_hit_chance("")
+		battle_ui.set_status("Invalid target for %s" % _selected_ability.display_name)
 		return
 
-	_pending_attack_target = null
-	battle_ui.set_hit_chance("")
+	await _execute_ability(_selected_ability, active, grid_pos)
 
 
 func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
-	var ability := attacker.resolve_ability(
-		BattleEnums.AbilityCategory.ACTION,
-		defender.grid_pos,
-		_ability_ctx,
-	)
+	var ability := _selected_ability
 	if ability == null:
+		return
+	if not ability.is_valid_target(attacker, defender.grid_pos, _ability_ctx):
 		battle_ui.set_status("Out of range")
 		return
 	var distance_penalty_per_tile := _distance_penalty_per_tile(ability)
-	var chance := combat_system.compute_hit_chance(attacker, defender, distance_penalty_per_tile)
+	var use_chebyshev := _use_chebyshev(ability)
+	var chance := combat_system.compute_hit_chance(
+		attacker, defender, distance_penalty_per_tile, use_chebyshev
+	)
 	if _pending_attack_target == defender:
 		await _execute_ability(ability, attacker, defender.grid_pos)
 	else:
@@ -224,6 +277,53 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 			typed_death.append(u as Unit)
 
 	await action_runner.run(commit, present, complete, typed_death)
+	_pending_attack_target = null
+	if _selected_ability and not _selected_ability.can_activate(unit, _ability_ctx):
+		_selected_ability = null
+	_refresh_ability_bar()
+	_refresh_highlights()
+	if unit.is_player() and not battle_state.is_over():
+		if _selected_ability:
+			battle_ui.set_status("Selected %s — choose a target" % _selected_ability.display_name)
+		else:
+			battle_ui.set_status("Select an ability, or End Turn")
+
+
+func _player_abilities(unit: Unit) -> Array[AbilityData]:
+	var result: Array[AbilityData] = []
+	if unit == null:
+		return result
+	for ability in unit.abilities:
+		if ability == null:
+			continue
+		if ability.category == BattleEnums.AbilityCategory.PASSIVE:
+			continue
+		result.append(ability)
+	return result
+
+
+func _refresh_ability_bar() -> void:
+	var active := turn_manager.active_unit
+	if active == null or not active.is_player() or battle_state.is_over():
+		_selected_ability = null
+		battle_ui.clear_abilities()
+		return
+	if _selected_ability and not _selected_ability.can_activate(active, _ability_ctx):
+		_selected_ability = null
+	var abilities := _player_abilities(active)
+	battle_ui.set_abilities(
+		abilities,
+		_selected_ability,
+		func(ability: AbilityData) -> bool:
+			return ability != null and ability.can_activate(active, _ability_ctx)
+	)
+
+
+func _clear_selected_ability() -> void:
+	_selected_ability = null
+	_pending_attack_target = null
+	battle_ui.set_hit_chance("")
+	_refresh_ability_bar()
 	_refresh_highlights()
 
 
@@ -232,31 +332,18 @@ func _refresh_highlights() -> void:
 	var active := turn_manager.active_unit
 	if active == null or not active.is_player() or battle_state.is_over():
 		return
-	var move_tiles: Array[Vector2i] = []
-	var move_seen: Dictionary = {}
-	for ability in active.get_abilities_by_category(BattleEnums.AbilityCategory.MOVE):
-		if not ability.can_activate(active, _ability_ctx):
-			continue
-		for tile in ability.get_target_tiles(active, _ability_ctx):
-			if move_seen.has(tile):
-				continue
-			move_seen[tile] = true
-			move_tiles.append(tile)
-	if not move_tiles.is_empty():
-		grid_view.show_reachable(move_tiles)
-
-	var attack_tiles: Array[Vector2i] = []
-	var attack_seen: Dictionary = {}
-	for ability in active.get_abilities_by_category(BattleEnums.AbilityCategory.ACTION):
-		if not ability.can_activate(active, _ability_ctx):
-			continue
-		for tile in ability.get_target_tiles(active, _ability_ctx):
-			if attack_seen.has(tile):
-				continue
-			attack_seen[tile] = true
-			attack_tiles.append(tile)
-	if not attack_tiles.is_empty():
-		grid_view.show_attackable(attack_tiles)
+	if _selected_ability == null or not _selected_ability.can_activate(active, _ability_ctx):
+		return
+	var tiles := _selected_ability.get_target_tiles(active, _ability_ctx)
+	if tiles.is_empty():
+		return
+	match _selected_ability.category:
+		BattleEnums.AbilityCategory.MOVE:
+			grid_view.show_reachable(tiles)
+		BattleEnums.AbilityCategory.ACTION:
+			grid_view.show_attackable(tiles)
+		_:
+			grid_view.show_attackable(tiles)
 
 
 func _log_color_for(unit: Unit) -> Color:
@@ -269,3 +356,9 @@ func _distance_penalty_per_tile(ability: AbilityData) -> int:
 	if ability is SimpleAttackAbilityData:
 		return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
 	return 0
+
+
+func _use_chebyshev(ability: AbilityData) -> bool:
+	if ability is SimpleAttackAbilityData:
+		return (ability as SimpleAttackAbilityData).use_chebyshev
+	return false

@@ -6,10 +6,11 @@ extends SimpleAttackAbilityData
 
 func _init() -> void:
 	id = &"warrior_basic_attack"
-	display_name = "WarriorBasicAttack"
+	display_name = "Melee"
 	category = BattleEnums.AbilityCategory.ACTION
 	cost_slot = BattleEnums.CostSlot.ACTION
 	attack_range = 1
+	use_chebyshev = true
 
 
 func can_activate(unit: Unit, ctx: AbilityContext) -> bool:

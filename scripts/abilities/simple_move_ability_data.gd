@@ -3,7 +3,7 @@ extends AbilityData
 
 func _init() -> void:
 	id = &"simple_move"
-	display_name = "SimpleMove"
+	display_name = "Move"
 	category = BattleEnums.AbilityCategory.MOVE
 	cost_slot = BattleEnums.CostSlot.MOVE
 

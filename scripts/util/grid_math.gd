@@ -29,6 +29,10 @@ static func manhattan(a: Vector2i, b: Vector2i) -> int:
 	return absi(a.x - b.x) + absi(a.y - b.y)
 
 
+static func chebyshev(a: Vector2i, b: Vector2i) -> int:
+	return maxi(absi(a.x - b.x), absi(a.y - b.y))
+
+
 static func orthogonal_neighbors(grid_pos: Vector2i) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	var offsets: Array[Vector2i] = [

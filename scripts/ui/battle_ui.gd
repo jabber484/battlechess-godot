@@ -2,6 +2,7 @@ class_name BattleUI
 extends CanvasLayer
 
 signal end_turn_pressed
+signal ability_selected(ability: AbilityData)
 
 @onready var round_label: Label = %RoundLabel
 @onready var initiative_bar: HBoxContainer = %InitiativeBar
@@ -10,12 +11,14 @@ signal end_turn_pressed
 @onready var hit_chance_label: Label = %HitChanceLabel
 @onready var status_label: Label = %StatusLabel
 @onready var end_turn_button: Button = %EndTurnButton
+@onready var ability_bar: HBoxContainer = %AbilityBar
 @onready var log_label: RichTextLabel = %LogLabel
 @onready var log_scroll: ScrollContainer = %LogScroll
 
 const MAX_LOG_LINES := 50
 
 var _log_lines: PackedStringArray = PackedStringArray()
+var _ability_buttons: Dictionary = {} # AbilityData -> Button
 
 
 func _ready() -> void:
@@ -91,6 +94,42 @@ func set_end_turn_enabled(enabled: bool) -> void:
 	end_turn_button.disabled = not enabled
 
 
+func clear_abilities() -> void:
+	_ability_buttons.clear()
+	for child in ability_bar.get_children():
+		child.queue_free()
+
+
+func set_abilities(
+	abilities: Array[AbilityData],
+	selected: AbilityData,
+	is_activatable: Callable,
+) -> void:
+	clear_abilities()
+	for ability in abilities:
+		if ability == null:
+			continue
+		var button := Button.new()
+		button.text = ability.display_name
+		button.custom_minimum_size = Vector2(120, 36)
+		button.disabled = not bool(is_activatable.call(ability))
+		button.pressed.connect(_on_ability_button_pressed.bind(ability))
+		ability_bar.add_child(button)
+		_ability_buttons[ability] = button
+	set_selected_ability(selected)
+
+
+func set_selected_ability(selected: AbilityData) -> void:
+	for ability in _ability_buttons:
+		var button: Button = _ability_buttons[ability]
+		if not is_instance_valid(button):
+			continue
+		if ability == selected:
+			button.modulate = Color(1.15, 1.05, 0.65)
+		else:
+			button.modulate = Color.WHITE
+
+
 func show_battle_result(result: BattleEnums.BattleResult) -> void:
 	match result:
 		BattleEnums.BattleResult.VICTORY:
@@ -99,3 +138,7 @@ func show_battle_result(result: BattleEnums.BattleResult) -> void:
 			status_label.text = "DEFEAT"
 		_:
 			pass
+
+
+func _on_ability_button_pressed(ability: AbilityData) -> void:
+	ability_selected.emit(ability)

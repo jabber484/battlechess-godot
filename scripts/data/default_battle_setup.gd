@@ -7,6 +7,7 @@ const SimpleMoveAbilityDataScript := preload("res://scripts/abilities/simple_mov
 const SimpleAttackAbilityDataScript := preload("res://scripts/abilities/simple_attack_ability_data.gd")
 const WarriorBasicAttackAbilityDataScript := preload("res://scripts/abilities/warrior_basic_attack_ability_data.gd")
 const WarriorStaminaShieldAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_shield_ability_data.gd")
+const WarriorStaminaRechargeAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_recharge_ability_data.gd")
 
 
 static func get_unit_spawns() -> Array[UnitSpawnData]:
@@ -75,5 +76,6 @@ static func _make_warrior_stats() -> UnitStatsData:
 	abilities.append(SimpleMoveAbilityDataScript.new())
 	abilities.append(WarriorBasicAttackAbilityDataScript.new())
 	abilities.append(WarriorStaminaShieldAbilityDataScript.new())
+	abilities.append(WarriorStaminaRechargeAbilityDataScript.new())
 	stats.abilities = abilities
 	return stats

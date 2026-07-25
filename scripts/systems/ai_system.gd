@@ -1,6 +1,8 @@
 class_name AISystem
 extends Node
 
+const CombatSystemScript := preload("res://scripts/systems/combat_system.gd")
+
 @export var grid_system_path: NodePath
 @export var pathfinding_path: NodePath
 @export var combat_system_path: NodePath
@@ -9,7 +11,7 @@ extends Node
 
 var grid_system: GridSystem
 var pathfinding: PathfindingSystem
-var combat_system: CombatSystem
+var combat_system: CombatSystemScript
 var turn_manager: TurnManager
 var battle_state: BattleState
 
@@ -20,7 +22,7 @@ var _attacker: Callable
 func _ready() -> void:
 	grid_system = get_node(grid_system_path) as GridSystem
 	pathfinding = get_node(pathfinding_path) as PathfindingSystem
-	combat_system = get_node(combat_system_path) as CombatSystem
+	combat_system = get_node(combat_system_path) as CombatSystemScript
 	turn_manager = get_node(turn_manager_path) as TurnManager
 	battle_state = get_node(battle_state_path) as BattleState
 
@@ -103,10 +105,16 @@ func run_unit_turn(unit: Unit) -> void:
 	if not targets.is_empty():
 		targets.sort_custom(func(a: Unit, b: Unit) -> bool:
 			var ca := combat_system.compute_hit_chance(
-				unit, a, _distance_penalty_for_target(unit, a, ctx)
+				unit,
+				a,
+				_distance_penalty_for_target(unit, a, ctx),
+				_use_chebyshev_for_target(unit, a, ctx),
 			)
 			var cb := combat_system.compute_hit_chance(
-				unit, b, _distance_penalty_for_target(unit, b, ctx)
+				unit,
+				b,
+				_distance_penalty_for_target(unit, b, ctx),
+				_use_chebyshev_for_target(unit, b, ctx),
 			)
 			if ca != cb:
 				return ca > cb
@@ -126,8 +134,13 @@ func _score_tile(unit: Unit, tile: Vector2i, players: Array[Unit]) -> int:
 	var can_shoot_from_here := false
 	var distance_penalty_per_tile := _primary_attack_distance_penalty(unit)
 	var max_range := _primary_attack_range(unit)
+	var use_chebyshev := _primary_attack_use_chebyshev(unit)
 	for player in players:
-		var dist := GridMath.manhattan(tile, player.grid_pos)
+		var dist := (
+			GridMath.chebyshev(tile, player.grid_pos)
+			if use_chebyshev
+			else GridMath.manhattan(tile, player.grid_pos)
+		)
 		nearest = mini(nearest, dist)
 		if dist <= max_range:
 			can_shoot_from_here = true
@@ -176,6 +189,13 @@ func _primary_attack_range(unit: Unit) -> int:
 	return 0
 
 
+func _primary_attack_use_chebyshev(unit: Unit) -> bool:
+	for ability in unit.get_abilities_by_category(BattleEnums.AbilityCategory.ACTION):
+		if ability is SimpleAttackAbilityData:
+			return (ability as SimpleAttackAbilityData).use_chebyshev
+	return false
+
+
 func _distance_penalty_for_target(unit: Unit, target: Unit, ctx: AbilityContext) -> int:
 	var ability := unit.resolve_ability(
 		BattleEnums.AbilityCategory.ACTION,
@@ -185,3 +205,14 @@ func _distance_penalty_for_target(unit: Unit, target: Unit, ctx: AbilityContext)
 	if ability is SimpleAttackAbilityData:
 		return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
 	return 0
+
+
+func _use_chebyshev_for_target(unit: Unit, target: Unit, ctx: AbilityContext) -> bool:
+	var ability := unit.resolve_ability(
+		BattleEnums.AbilityCategory.ACTION,
+		target.grid_pos,
+		ctx,
+	)
+	if ability is SimpleAttackAbilityData:
+		return (ability as SimpleAttackAbilityData).use_chebyshev
+	return false

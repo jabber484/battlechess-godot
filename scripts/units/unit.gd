@@ -243,6 +243,15 @@ func modify_incoming_damage(context) -> void:
 		ability.on_incoming_damage(self, context)
 
 
+func notify_turn_started() -> void:
+	for ability in abilities:
+		if ability == null:
+			continue
+		if ability.category != BattleEnums.AbilityCategory.PASSIVE:
+			continue
+		ability.on_turn_started(self)
+
+
 func _build_damage_context(amount: int, attacker: Unit) -> RefCounted:
 	var ctx: RefCounted = _DamageContextRes.new()
 	ctx.attacker = attacker

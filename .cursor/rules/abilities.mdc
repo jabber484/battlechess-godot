@@ -17,23 +17,23 @@ alwaysApply: false
 
 - Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION` | `PASSIVE`), `cost_slot` (`MOVE` → `notify_moved`, `ACTION` → `notify_acted`, `NONE` for passives)
 - Methods: `can_activate(unit, ctx)`, `get_target_tiles(unit, ctx)`, `is_valid_target(unit, target_pos, ctx)`, `build_execution(unit, target_pos, ctx) -> Dictionary` (`commit` / `present` / `complete` / `death_units`)
-- Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` when needed. `Unit.modify_incoming_damage` dispatches to `PASSIVE` abilities.
+- Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` and/or `on_turn_started(unit)` when needed. `Unit.modify_incoming_damage` / `Unit.notify_turn_started` dispatch to `PASSIVE` abilities.
 - Use `AbilityContext` for system refs (`pathfinding`, `grid_system`, `turn_manager`, `battle_state`, `combat_system`). Abilities must not cache Node paths.
 - Execution may include intent for presentation: `presentation` (`BattleEnums.Presentation`), plus `path` / `defender`. Leave `present` empty so `BattlePresenter` fills camera/tweens. Do not reference `CameraRig` from abilities.
 
 ## Dispatch
 
-- Do not hardcode ability ids for click/AI routing. Resolve by `category` + `can_activate` + `is_valid_target`.
-- Without an ability picker: first matching ability wins; MOVE and ACTION highlights are each the **union** of activatable abilities in that category.
+- Player targeting is **ability-first**: `BattleUI` lists non-passive abilities; the player selects one, then clicks a valid target. Highlights and tile clicks use only `_selected_ability`.
+- AI still resolves by `category` + `can_activate` + `is_valid_target` (`Unit.resolve_ability`); first matching ability wins.
 - Presentation (camera/tweens/move log) is owned by `BattlePresenter`; `BattleController` orchestrates; `ActionRunner` remains the execution pipeline.
 - Hit/damage math stays in `CombatSystem`; attack presentation calls into it (same role pathfinding plays for move).
-- Attack `attack_range` and `distance_penalty_per_tile` live on attack abilities (e.g. `SimpleAttackAbilityData`), passed into `CombatSystem`. Cover penalties stay global on `CombatSystem`.
-- Warrior basic attack: `attack_range = 1`.
+- Attack `attack_range`, `distance_penalty_per_tile`, and `use_chebyshev` live on attack abilities (e.g. `SimpleAttackAbilityData`), passed into `CombatSystem`. Cover penalties stay global on `CombatSystem`.
+- Warrior basic attack: `attack_range = 1`, `use_chebyshev = true` (orthogonal + diagonal melee).
 
 ## Adding a new ability
 
 1. Subclass `AbilityData` (e.g. `SimpleMoveAbilityData`, `SimpleAttackAbilityData`, `LeapAbilityData`), unique `id`, set `category` / `cost_slot`.
-2. Override the four methods; read damage/accuracy from `unit`; set attack `attack_range` / falloff on the ability.
+2. Override the four methods; read damage/accuracy from `unit`; set attack `attack_range` / falloff / `use_chebyshev` on the ability.
 3. Put an instance on the unit’s `abilities` array (via `UnitStats` / spawn setup).
 4. Do not add parallel execute paths in the controller when category resolve already covers it.
 
@@ -43,7 +43,8 @@ Standard abilities:
 - Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`)
 - Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost, extends simple attack
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
+- Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
 
 ## Out of scope reminders
 
-- Ability picker UI and cooldowns are future work; keep the API above stable for them.
+- Cooldowns are future work; keep the AbilityData API above stable for them.

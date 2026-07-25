@@ -4,20 +4,21 @@ extends RefCounted
 ## Fills ability execution presentation from intent keys (`path`, `defender`),
 ## not ability class checks. Abilities stay headless; this owns camera/tweens/VFX hooks.
 
+const CombatSystemScript := preload("res://scripts/systems/combat_system.gd")
 const MOVE_TILE_DURATION := 0.28
 const ATTACK_CAMERA_DELAY := 0.5
 const ATTACK_FOCUS_DURATION := 1.0
 
 var _host: Node
 var _camera_rig: CameraRig
-var _combat_system: CombatSystem
+var _combat_system: CombatSystemScript
 var _battle_ui: BattleUI
 
 
 func _init(
 	host: Node,
 	camera_rig: CameraRig,
-	combat_system: CombatSystem,
+	combat_system: CombatSystemScript,
 	battle_ui: BattleUI,
 ) -> void:
 	_host = host
@@ -112,11 +113,14 @@ func _enhance_attack(unit: Unit, execution: Dictionary) -> void:
 	var target: Unit = defender as Unit
 	var distance_penalty_per_tile := int(execution.get("distance_penalty_per_tile", 0))
 	var max_range := int(execution.get("attack_range", 0))
+	var use_chebyshev := bool(execution.get("use_chebyshev", false))
 	execution["present"] = func() -> void:
 		focus_grid_pos(target.grid_pos)
 		await _host.get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
 		if _combat_system:
-			_combat_system.commit_attack(unit, target, distance_penalty_per_tile, max_range)
+			_combat_system.commit_attack(
+				unit, target, distance_penalty_per_tile, max_range, use_chebyshev
+			)
 		await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
 		focus_grid_pos(unit.grid_pos)
 
