@@ -66,7 +66,7 @@ static func _make_warrior_stats() -> UnitStatsData:
 	var stats := UnitStatsData.new()
 	stats.display_name = "Warrior"
 	stats.speed = 5
-	stats.move_range = 3
+	stats.move_range = 4
 	stats.accuracy = 100
 	stats.damage = 30
 	stats.max_hp = 110
