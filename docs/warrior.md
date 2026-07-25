@@ -1,7 +1,7 @@
 # Warrior — Design Doc
 
 Status: **implemented (prototype)**  
-Last updated: 2026-07-25  
+Last updated: 2026-07-26  
 Role: frontline melee bruiser whose **stamina** is both attack fuel and a damage sponge.
 
 ---
@@ -47,6 +47,7 @@ UnitStats
   └── abilities[]
         ├── SimpleMoveAbilityData          (Walk)
         ├── WarriorBasicAttackAbilityData  (Melee)
+        ├── WarriorRecklessAttackAbilityData (Reckless — free action, costs stamina; enemy hits first)  _(design)_
         ├── WarriorStaminaShieldAbilityData (passive)
         └── WarriorStaminaRechargeAbilityData (passive)
 ```
@@ -90,6 +91,7 @@ Stamina is a single pool (`BattleEnums.UnitResource.STAMINA`).
 | Event                | Cost                     | Source                                       |
 | -------------------- | ------------------------ | -------------------------------------------- |
 | Melee attack         | **10**                   | `WarriorBasicAttackAbilityData.stamina_cost` |
+| Reckless attack      | **10** stamina, **0** action slot | `WarriorRecklessAttackAbilityData` — free action; pay stamina + retaliation |
 | Incoming damage soak | **1 per 1 HP prevented** | `WarriorStaminaShieldAbilityData`            |
 
 ### Gains
@@ -103,7 +105,7 @@ Stamina is a single pool (`BattleEnums.UnitResource.STAMINA`).
 
 - Full stamina ≈ **5 melee attacks** with no soak, or **50 HP** fully absorbed with no attacks.
 - Recharge (+10/turn) ≈ **one free attack per turn** if the Warrior never soaks — or partial recovery after soaking.
-- Empty stamina → **cannot melee**; shield does nothing until recharge (or future restore tools).
+- Empty stamina → **cannot** Melee or Reckless; shield does nothing until recharge (or future restore tools).
 - Overhead HUD shows an amber resource bar under HP when the unit has a resource.
 
 **Design tension:** attacking empties the shield; soaking empties the attack budget. Standing still and tanking is viable until stamina runs dry; then the Warrior must disengage or die.
@@ -128,6 +130,36 @@ Shared move ability. Uses pathfinding + Chebyshev neighbors. Costs the **move** 
 | Commit               | Spend stamina, then normal attack present/resolve                |
 
 `can_activate` requires: action available, stamina, and at least one living enemy in range that is not in full cover. Half cover is still a valid melee target (hit chance reduced as usual).
+
+### Reckless Attack — `warrior_reckless_attack` _(design — not implemented)_
+
+Bonus melee on your turn: **does not use the ACTION slot** (`cost_slot = NONE`), but **costs stamina** like Melee. You also pay by letting the enemy **strike first**.
+
+| Field                | Value                                                            |
+| -------------------- | ---------------------------------------------------------------- |
+| Category / cost slot | `ACTION` / **`NONE`** (free — does not spend move or action)     |
+| `attack_range`       | **1** (same as Melee — adjacent including diagonal)              |
+| Stamina gate         | `current_stamina >= stamina_cost` (default **10**, same as Melee)|
+| Full cover           | Same as Melee — **cannot** target directional full cover         |
+| Distance falloff     | None at range 1                                                  |
+| Commit               | Spend stamina → **retaliation first** → Warrior attack if able   |
+
+`can_activate`: enough stamina, adjacent valid target (not full cover), and Reckless not already used this turn. **Does not** require `can_act_more`.
+
+**Resolve order:**
+
+1. Spend stamina (same commit timing lean as Melee — before the exchange).
+2. **Retaliation:** the target attacks the Warrior first (their normal attack / basic strike if valid against the Warrior). Real attack — hit chance, cover, and Warrior **Stamina Shield** soak all apply as usual.
+3. If the Warrior is **dead** (or otherwise unable to continue), stop — no Warrior swing (stamina already spent).
+4. If the Warrior is still alive and the target is still a valid adjacent melee target, the Warrior performs a normal melee hit (same damage rules as Melee).
+
+**Feel:** same-turn Walk/Melee + Reckless for a greedy double tap, or Reckless after moving when you still want to keep ACTION for something else later — but you eat a hit and burn stamina. Bad into full-health bruisers; good as a finishing bonus when you can afford the retaliate.
+
+**Open impl notes:**
+
+- If the target cannot legally attack the Warrior (e.g. their only attack is out of range), **lean:** skip retaliation and still allow the Warrior swing (rare). Alternate: require a valid retaliator and disable the ability otherwise.
+- Retaliation should not consume the enemy’s turn / action budget — it’s an interrupt strike, not their turn.
+- **Once per own turn:** hard rule. Track a used flag on the ability instance; clear on the Warrior’s turn start. Cannot Reckless twice in one turn even with leftover stamina.
 
 ### Stamina Shield — `warrior_stamina_shield` (passive)
 
@@ -164,8 +196,8 @@ Typical loop:
 
 ## Player & AI notes
 
-- **Player:** Ability-first UI lists non-passives (Walk, Melee). Melee disables when out of range or out of stamina.
-- **AI:** Resolves by category + `can_activate` / `is_valid_target`; first matching ability wins. Warrior AI currently uses the same generic heuristics as other units — no dedicated “preserve stamina” policy yet.
+- **Player:** Ability-first UI lists non-passives (Walk, Melee, Reckless when shipped). Melee / Reckless disable when out of range or out of stamina; Reckless also disables after one use until the Warrior’s next turn start. Reckless does not require an available ACTION.
+- **AI:** Resolves by category + `can_activate` / `is_valid_target`; first matching ability wins. Warrior AI currently uses the same generic heuristics as other units — no dedicated “preserve stamina” or “when to Reckless” policy yet.
 
 ---
 
@@ -175,6 +207,7 @@ Typical loop:
 | ------------------- | ---------------------------------------------------------------- |
 | Spawn / stats / kit | `scripts/data/default_battle_setup.gd` → `_make_warrior_stats()` |
 | Melee               | `scripts/abilities/warrior_basic_attack_ability_data.gd`         |
+| Reckless _(planned)_| `scripts/abilities/warrior_reckless_attack_ability_data.gd`      |
 | Shield              | `scripts/abilities/warrior_stamina_shield_ability_data.gd`       |
 | Recharge            | `scripts/abilities/warrior_stamina_recharge_ability_data.gd`     |
 | Resource API        | `scripts/units/unit.gd`                                          |
@@ -211,7 +244,7 @@ Not required for the current prototype kit:
 - Equipment / progression that modifies the kit
 - Alternate resources on the same unit (one `resource_id` for now)
 
-Possible later abilities that still fit the fantasy: shove, taunt/mark, spend stamina for a burst hit, or a once-per-battle full refill — all as additional `AbilityData` entries, not Unit subclasses.
+Possible later abilities that still fit the fantasy: shove, taunt/mark, spend stamina for a burst hit, or a once-per-battle full refill — all as additional `AbilityData` entries, not Unit subclasses. **Reckless Attack** is specified above and waiting on implementation.
 
 ---
 
@@ -222,5 +255,7 @@ Possible later abilities that still fit the fantasy: shove, taunt/mark, spend st
 - [x] Shield soaks HP damage 1:1 with stamina
 - [x] Recharges stamina at turn start
 - [x] Overhead HUD shows HP + stamina
+- [ ] Reckless Attack: free action (`NONE`), costs stamina (10); enemy retaliates first; Warrior hits if still able
+- [ ] Reckless once per own turn (flag cleared on turn start)
 - [ ] Tuned encounter where empty-stamina failure is readable
 - [ ] AI respects stamina scarcity (optional)
