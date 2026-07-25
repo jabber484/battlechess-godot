@@ -27,13 +27,15 @@ alwaysApply: false
 - AI still resolves by `category` + `can_activate` + `is_valid_target` (`Unit.resolve_ability`); first matching ability wins.
 - Presentation (camera/tweens/move log) is owned by `BattlePresenter`; `BattleController` orchestrates; `ActionRunner` remains the execution pipeline.
 - Hit/damage math stays in `CombatSystem`; attack presentation calls into it (same role pathfinding plays for move).
-- Attack `attack_range`, `distance_penalty_per_tile`, and `use_chebyshev` live on attack abilities (e.g. `SimpleAttackAbilityData`), passed into `CombatSystem`. Cover penalties stay global on `CombatSystem`.
-- Warrior basic attack: `attack_range = 1`, `use_chebyshev = true` (orthogonal + diagonal melee).
+- Attack `attack_range` and `distance_penalty_per_tile` live on attack abilities (e.g. `SimpleAttackAbilityData`), passed into `CombatSystem`. Cover penalties stay global on `CombatSystem`.
+- Warrior basic attack: `attack_range = 1` (adjacent including diagonal).
+- Grid range/path defaults (Chebyshev / diagonals): see `grid.mdc`.
+
 
 ## Adding a new ability
 
 1. Subclass `AbilityData` (e.g. `SimpleMoveAbilityData`, `SimpleAttackAbilityData`, `LeapAbilityData`), unique `id`, set `category` / `cost_slot`.
-2. Override the four methods; read damage/accuracy from `unit`; set attack `attack_range` / falloff / `use_chebyshev` on the ability.
+2. Override the four methods; read damage/accuracy from `unit`; set attack `attack_range` / falloff on the ability.
 3. Put an instance on the unit’s `abilities` array (via `UnitStats` / spawn setup).
 4. Do not add parallel execute paths in the controller when category resolve already covers it.
 

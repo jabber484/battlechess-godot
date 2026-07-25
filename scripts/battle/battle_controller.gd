@@ -223,9 +223,8 @@ func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
 		battle_ui.set_status("Out of range")
 		return
 	var distance_penalty_per_tile := _distance_penalty_per_tile(ability)
-	var use_chebyshev := _use_chebyshev(ability)
 	var chance := combat_system.compute_hit_chance(
-		attacker, defender, distance_penalty_per_tile, use_chebyshev
+		attacker, defender, distance_penalty_per_tile
 	)
 	if _pending_attack_target == defender:
 		await _execute_ability(ability, attacker, defender.grid_pos)
@@ -356,9 +355,3 @@ func _distance_penalty_per_tile(ability: AbilityData) -> int:
 	if ability is SimpleAttackAbilityData:
 		return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
 	return 0
-
-
-func _use_chebyshev(ability: AbilityData) -> bool:
-	if ability is SimpleAttackAbilityData:
-		return (ability as SimpleAttackAbilityData).use_chebyshev
-	return false

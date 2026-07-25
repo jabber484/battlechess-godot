@@ -1,0 +1,16 @@
+---
+description: Grid distance and pathfinding use Chebyshev (diagonals) by default
+globs: scripts/util/grid_math.gd,scripts/systems/pathfinding_system.gd,scripts/systems/combat_system.gd,scripts/systems/ai_system.gd,scripts/abilities/**/*.gd
+alwaysApply: true
+---
+
+# Grid distance & pathfinding
+
+**Default:** all range checks and movement paths use **Chebyshev** distance (8-directional — diagonals count as 1 tile), unless a feature explicitly opts out.
+
+- Distance: `GridMath.chebyshev(a, b)` — `max(|dx|, |dy|)`
+- Neighbors / BFS steps: `GridMath.chebyshev_neighbors(pos)`
+- Attack range, move reachability, and `PathfindingSystem` paths all follow this
+- Prefer Chebyshev over Manhattan for new combat/movement logic
+
+**Opt-out only when specified** (e.g. an ability that must be orthogonal-only). Then use `GridMath.manhattan` / `GridMath.orthogonal_neighbors` and document why on that ability.

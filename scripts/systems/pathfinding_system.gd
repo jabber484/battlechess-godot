@@ -1,47 +1,21 @@
 class_name PathfindingSystem
 extends Node
 
+const GridMathScript := preload("res://scripts/util/grid_math.gd")
+
 @export var grid_system_path: NodePath
 
 var grid_system: GridSystem
-var _astar: AStarGrid2D = AStarGrid2D.new()
 
 
 func _ready() -> void:
 	grid_system = get_node(grid_system_path) as GridSystem
-	_astar.region = Rect2i(0, 0, GridMath.GRID_SIZE, GridMath.GRID_SIZE)
-	_astar.cell_size = Vector2(1, 1)
-	_astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
-	_astar.update()
-	rebuild_solids()
-	if grid_system:
-		grid_system.occupancy_changed.connect(func(_p): rebuild_solids())
-
-
-func rebuild_solids(ignore_unit: Unit = null) -> void:
-	if grid_system == null:
-		return
-	for x in GridMath.GRID_SIZE:
-		for y in GridMath.GRID_SIZE:
-			var pos := Vector2i(x, y)
-			var solid := not grid_system.can_stand(pos, ignore_unit)
-			# Always allow the ignore unit's own tile as passable start.
-			if ignore_unit and pos == ignore_unit.grid_pos:
-				solid = false
-			_astar.set_point_solid(pos, solid)
-	# Mark non-walkable tiles solid even if empty.
-	for x in GridMath.GRID_SIZE:
-		for y in GridMath.GRID_SIZE:
-			var pos := Vector2i(x, y)
-			if not grid_system.is_walkable(pos):
-				_astar.set_point_solid(pos, true)
 
 
 func get_reachable_tiles(unit: Unit) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	if unit == null or unit.is_dead():
 		return result
-	rebuild_solids(unit)
 	var start := unit.grid_pos
 	var visited: Dictionary = {}
 	var queue: Array = []
@@ -55,13 +29,10 @@ func get_reachable_tiles(unit: Unit) -> Array[Vector2i]:
 			result.append(pos)
 		if dist >= unit.move_range:
 			continue
-		for n in GridMath.orthogonal_neighbors(pos):
+		for n in GridMathScript.chebyshev_neighbors(pos):
 			if visited.has(n):
 				continue
-			if not grid_system.can_stand(n, unit):
-				continue
-			# Path must exist through A* solids (occupied blocked).
-			if _astar.is_point_solid(n) and n != unit.grid_pos:
+			if not _can_step_on(n, unit):
 				continue
 			visited[n] = dist + 1
 			queue.append({"pos": n, "dist": dist + 1})
@@ -69,23 +40,50 @@ func get_reachable_tiles(unit: Unit) -> Array[Vector2i]:
 
 
 func find_path(from_pos: Vector2i, to_pos: Vector2i, mover: Unit = null) -> Array[Vector2i]:
-	rebuild_solids(mover)
-	if not GridMath.is_in_bounds(from_pos) or not GridMath.is_in_bounds(to_pos):
+	if not GridMathScript.is_in_bounds(from_pos) or not GridMathScript.is_in_bounds(to_pos):
 		return []
+	if from_pos == to_pos:
+		return [from_pos]
 	if mover and not grid_system.can_stand(to_pos, mover):
 		return []
 	if mover == null and (not grid_system.is_walkable(to_pos) or grid_system.get_occupant(to_pos) != null):
 		return []
-	# Ensure destination is pathable for A*.
-	_astar.set_point_solid(to_pos, false)
-	if mover:
-		_astar.set_point_solid(from_pos, false)
-	var id_path := _astar.get_id_path(from_pos, to_pos)
+
+	var came_from: Dictionary = {}
+	var queue: Array[Vector2i] = [from_pos]
+	came_from[from_pos] = from_pos
+	while not queue.is_empty():
+		var pos: Vector2i = queue.pop_front()
+		if pos == to_pos:
+			break
+		for n in GridMathScript.chebyshev_neighbors(pos):
+			if came_from.has(n):
+				continue
+			if n != to_pos and not _can_step_on(n, mover):
+				continue
+			came_from[n] = pos
+			queue.append(n)
+
+	if not came_from.has(to_pos):
+		return []
+
 	var path: Array[Vector2i] = []
-	for id in id_path:
-		path.append(id)
+	var cursor := to_pos
+	while true:
+		path.push_front(cursor)
+		if cursor == from_pos:
+			break
+		cursor = came_from[cursor]
 	return path
 
 
 func is_reachable(unit: Unit, target: Vector2i) -> bool:
 	return get_reachable_tiles(unit).has(target)
+
+
+func _can_step_on(pos: Vector2i, mover: Unit) -> bool:
+	if grid_system == null:
+		return false
+	if mover:
+		return grid_system.can_stand(pos, mover)
+	return grid_system.is_walkable(pos) and grid_system.get_occupant(pos) == null

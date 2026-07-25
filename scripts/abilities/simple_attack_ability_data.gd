@@ -4,8 +4,6 @@ extends AbilityData
 @export var attack_range: int = 5
 ## Hit-chance reduction per tile of range. 0 = no distance falloff.
 @export var distance_penalty_per_tile: int = 5
-## If true, range uses Chebyshev (includes diagonals). Else Manhattan.
-@export var use_chebyshev: bool = false
 
 
 func _init() -> void:
@@ -16,9 +14,7 @@ func _init() -> void:
 
 
 func tile_distance(a: Vector2i, b: Vector2i) -> int:
-	if use_chebyshev:
-		return GridMath.chebyshev(a, b)
-	return GridMath.manhattan(a, b)
+	return GridMath.chebyshev(a, b)
 
 
 func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
@@ -67,7 +63,6 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 		"presentation": BattleEnums.Presentation.ATTACK,
 		"distance_penalty_per_tile": distance_penalty_per_tile,
 		"attack_range": attack_range,
-		"use_chebyshev": use_chebyshev,
 	}
 
 

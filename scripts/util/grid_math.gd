@@ -43,3 +43,17 @@ static func orthogonal_neighbors(grid_pos: Vector2i) -> Array[Vector2i]:
 		if is_in_bounds(n):
 			result.append(n)
 	return result
+
+
+## 8-directional neighbors (Chebyshev). Default for range and pathfinding.
+static func chebyshev_neighbors(grid_pos: Vector2i) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	var offsets: Array[Vector2i] = [
+		Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+		Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)
+	]
+	for offset in offsets:
+		var n: Vector2i = grid_pos + offset
+		if is_in_bounds(n):
+			result.append(n)
+	return result
