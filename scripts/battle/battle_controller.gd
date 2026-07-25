@@ -24,6 +24,7 @@ var _pending_attack_target: Unit = null
 var _selected_ability: AbilityData = null
 var _ability_ctx: AbilityContext
 var _presenter: BattlePresenterScript
+var _hovered_tile: Vector2i = Vector2i(-1, -1)
 
 
 func _ready() -> void:
@@ -51,6 +52,7 @@ func _connect_signals() -> void:
 	ai_system.set_move_executor(_execute_ai_move)
 	ai_system.set_attack_executor(_execute_ai_attack)
 	grid_view.tile_picked.connect(_on_tile_picked)
+	grid_view.tile_hovered.connect(_on_tile_hovered)
 	turn_manager.round_started.connect(_on_round_started)
 	turn_manager.turn_started.connect(_on_turn_started)
 	turn_manager.turn_ended.connect(_on_turn_ended)
@@ -76,6 +78,7 @@ func _on_round_started(round_number: int) -> void:
 func _on_turn_started(unit: Unit) -> void:
 	_pending_attack_target = null
 	_selected_ability = null
+	_hovered_tile = Vector2i(-1, -1)
 	if unit:
 		unit.notify_turn_started()
 	battle_ui.set_active_unit(unit)
@@ -98,6 +101,7 @@ func _on_turn_ended(unit: Unit) -> void:
 		battle_ui.append_log("%s ended turn" % unit.display_name, _log_color_for(unit))
 	_selected_ability = null
 	_pending_attack_target = null
+	_hovered_tile = Vector2i(-1, -1)
 	battle_ui.clear_abilities()
 	grid_view.clear_highlights()
 	battle_ui.set_hit_chance("")
@@ -215,6 +219,13 @@ func _on_tile_picked(grid_pos: Vector2i) -> void:
 	await _execute_ability(_selected_ability, active, grid_pos)
 
 
+func _on_tile_hovered(grid_pos: Vector2i) -> void:
+	if _hovered_tile == grid_pos:
+		return
+	_hovered_tile = grid_pos
+	_refresh_highlights()
+
+
 func _handle_attack_click(attacker: Unit, defender: Unit) -> void:
 	var ability := _selected_ability
 	if ability == null:
@@ -270,6 +281,7 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 		return
 
 	grid_view.clear_highlights()
+	battle_ui.clear_abilities()
 	var typed_death: Array[Unit] = []
 	for u in death_units:
 		if u is Unit:
@@ -307,6 +319,9 @@ func _refresh_ability_bar() -> void:
 		_selected_ability = null
 		battle_ui.clear_abilities()
 		return
+	if turn_manager.is_busy():
+		battle_ui.clear_abilities()
+		return
 	if _selected_ability and not _selected_ability.can_activate(active, _ability_ctx):
 		_selected_ability = null
 	var abilities := _player_abilities(active)
@@ -339,10 +354,45 @@ func _refresh_highlights() -> void:
 	match _selected_ability.category:
 		BattleEnums.AbilityCategory.MOVE:
 			grid_view.show_reachable(tiles)
+			_refresh_move_hover_preview(active)
 		BattleEnums.AbilityCategory.ACTION:
 			grid_view.show_attackable(tiles)
 		_:
 			grid_view.show_attackable(tiles)
+
+
+func _refresh_move_hover_preview(unit: Unit) -> void:
+	if unit == null or not GridMath.is_in_bounds(_hovered_tile):
+		return
+	if not _selected_ability.is_valid_target(unit, _hovered_tile, _ability_ctx):
+		return
+	var path: Array[Vector2i] = pathfinding.find_path(unit.grid_pos, _hovered_tile, unit)
+	if path.size() >= 2:
+		grid_view.show_path(path)
+		grid_view.show_hover(_hovered_tile)
+	var attack_tiles := _attack_tiles_from(unit, _hovered_tile)
+	if not attack_tiles.is_empty():
+		grid_view.show_attackable(attack_tiles)
+
+
+## Temporarily evaluates ACTION ability targets as if `unit` stood on `from_pos`.
+func _attack_tiles_from(unit: Unit, from_pos: Vector2i) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	if unit == null:
+		return result
+	var seen: Dictionary = {}
+	var old_pos := unit.grid_pos
+	unit.grid_pos = from_pos
+	for ability in unit.get_abilities_by_category(BattleEnums.AbilityCategory.ACTION):
+		if ability == null or not ability.can_activate(unit, _ability_ctx):
+			continue
+		for tile in ability.get_target_tiles(unit, _ability_ctx):
+			if seen.has(tile):
+				continue
+			seen[tile] = true
+			result.append(tile)
+	unit.grid_pos = old_pos
+	return result
 
 
 func _log_color_for(unit: Unit) -> Color:

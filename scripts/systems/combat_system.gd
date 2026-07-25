@@ -44,8 +44,12 @@ func compute_hit_chance(
 ) -> int:
 	var distance := GridMath.chebyshev(attacker.grid_pos, defender.grid_pos)
 	var distance_penalty := distance * distance_penalty_per_tile
-	var cover_penalty := _cover_penalty(defender.grid_pos)
+	var cover_penalty := cover_penalty_between(attacker.grid_pos, defender.grid_pos)
 	return clampi(attacker.accuracy - distance_penalty - cover_penalty, 5, 100)
+
+
+func cover_penalty_between(attacker_pos: Vector2i, defender_pos: Vector2i) -> int:
+	return _penalty_for_cover(grid_system.get_directional_cover(defender_pos, attacker_pos))
 
 
 func commit_attack(
@@ -94,8 +98,8 @@ func _validate_attack(
 	return GridMath.chebyshev(attacker.grid_pos, defender.grid_pos) <= max_range
 
 
-func _cover_penalty(grid_pos: Vector2i) -> int:
-	match grid_system.get_cover(grid_pos):
+func _penalty_for_cover(cover: BattleEnums.Cover) -> int:
+	match cover:
 		BattleEnums.Cover.HALF:
 			return HALF_COVER_PENALTY
 		BattleEnums.Cover.FULL:

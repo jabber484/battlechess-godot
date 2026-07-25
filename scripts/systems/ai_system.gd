@@ -132,29 +132,26 @@ func _score_tile(unit: Unit, tile: Vector2i, players: Array[Unit]) -> int:
 	var can_shoot_from_here := false
 	var distance_penalty_per_tile := _primary_attack_distance_penalty(unit)
 	var max_range := _primary_attack_range(unit)
+	var best_self_cover_bonus := 0
 	for player in players:
 		var dist := GridMath.chebyshev(tile, player.grid_pos)
 		nearest = mini(nearest, dist)
+		match grid_system.get_directional_cover(tile, player.grid_pos):
+			BattleEnums.Cover.HALF:
+				best_self_cover_bonus = maxi(best_self_cover_bonus, 15)
+			BattleEnums.Cover.FULL:
+				best_self_cover_bonus = maxi(best_self_cover_bonus, 30)
+			_:
+				pass
 		if dist <= max_range:
 			can_shoot_from_here = true
 			var distance_penalty := dist * distance_penalty_per_tile
-			var cover_penalty := 0
-			match grid_system.get_cover(player.grid_pos):
-				BattleEnums.Cover.HALF:
-					cover_penalty = CombatSystem.HALF_COVER_PENALTY
-				BattleEnums.Cover.FULL:
-					cover_penalty = CombatSystem.FULL_COVER_PENALTY
+			var cover_penalty: int = combat_system.cover_penalty_between(tile, player.grid_pos)
 			var chance := clampi(unit.accuracy - distance_penalty - cover_penalty, 5, 100)
 			score += 40 + chance / 2
 			score += maxi(0, 40 - player.current_hp / 3)
 	score += maxi(0, 20 - nearest * 2)
-	match grid_system.get_cover(tile):
-		BattleEnums.Cover.HALF:
-			score += 15
-		BattleEnums.Cover.FULL:
-			score += 30
-		_:
-			pass
+	score += best_self_cover_bonus
 	if can_shoot_from_here:
 		score += 25
 	if tile == unit.grid_pos:

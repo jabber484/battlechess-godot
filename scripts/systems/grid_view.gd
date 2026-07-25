@@ -2,6 +2,7 @@ class_name GridView
 extends Node3D
 
 signal tile_picked(grid_pos: Vector2i)
+signal tile_hovered(grid_pos: Vector2i)
 
 @export var grid_system_path: NodePath
 @export var camera_path: NodePath
@@ -12,12 +13,14 @@ var _floor_body: StaticBody3D
 var _highlights: Node3D
 var _tile_meshes: Dictionary = {} # Vector2i -> MeshInstance3D
 var _highlight_meshes: Dictionary = {} # Vector2i -> MeshInstance3D
+var _hovered_tile: Vector2i = Vector2i(-1, -1)
 
 const FLOOR_COLOR := Color(0.45, 0.45, 0.48)
 const HALF_COVER_COLOR := Color(0.75, 0.6, 0.25)
 const FULL_COVER_COLOR := Color(0.35, 0.7, 0.4)
 const REACHABLE_COLOR := Color(0.3, 0.55, 0.95, 0.55)
 const ATTACKABLE_COLOR := Color(0.95, 0.35, 0.3, 0.55)
+const PATH_COLOR := Color(0.35, 0.95, 0.95, 0.7)
 const HOVER_COLOR := Color(1.0, 1.0, 0.4, 0.65)
 
 
@@ -41,11 +44,20 @@ func _deferred_build() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	if event is InputEventMouseMotion:
+		_emit_hover_if_changed(pick_tile_at_mouse())
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var pos := pick_tile_at_mouse()
 		if GridMath.is_in_bounds(pos):
 			tile_picked.emit(pos)
 			tile_clicked_forward(pos)
+
+
+func _emit_hover_if_changed(pos: Vector2i) -> void:
+	if pos == _hovered_tile:
+		return
+	_hovered_tile = pos
+	tile_hovered.emit(pos)
 
 
 func tile_clicked_forward(grid_pos: Vector2i) -> void:
@@ -82,6 +94,10 @@ func show_reachable(tiles: Array[Vector2i]) -> void:
 
 func show_attackable(tiles: Array[Vector2i]) -> void:
 	_show_colored(tiles, ATTACKABLE_COLOR)
+
+
+func show_path(tiles: Array[Vector2i]) -> void:
+	_show_colored(tiles, PATH_COLOR)
 
 
 func show_hover(grid_pos: Vector2i) -> void:
@@ -134,16 +150,35 @@ func _build_visuals() -> void:
 
 
 func _spawn_cover(grid_pos: Vector2i, cover: BattleEnums.Cover) -> void:
-	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
 	var h := 0.55 if cover == BattleEnums.Cover.HALF else 1.1
-	box.size = Vector3(0.55, h, 0.55)
-	mesh.mesh = box
-	mesh.position = GridMath.grid_to_world(grid_pos, h * 0.5 + 0.05)
+	var thickness := 0.06
+	var width := 0.92
+	var center := GridMath.grid_to_world(grid_pos, h * 0.5 + 0.05)
+	var color := HALF_COVER_COLOR if cover == BattleEnums.Cover.HALF else FULL_COVER_COLOR
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = HALF_COVER_COLOR if cover == BattleEnums.Cover.HALF else FULL_COVER_COLOR
-	mesh.material_override = mat
-	add_child(mesh)
+	mat.albedo_color = color
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+
+	var root := Node3D.new()
+	root.name = "Cover_%d_%d" % [grid_pos.x, grid_pos.y]
+	root.position = center
+	add_child(root)
+
+	# Four thin wall planes around the tile edge (N/S/E/W).
+	var walls: Array[Dictionary] = [
+		{"size": Vector3(width, h, thickness), "offset": Vector3(0.0, 0.0, -0.46)},
+		{"size": Vector3(width, h, thickness), "offset": Vector3(0.0, 0.0, 0.46)},
+		{"size": Vector3(thickness, h, width), "offset": Vector3(-0.46, 0.0, 0.0)},
+		{"size": Vector3(thickness, h, width), "offset": Vector3(0.46, 0.0, 0.0)},
+	]
+	for wall in walls:
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = wall["size"]
+		mesh.mesh = box
+		mesh.position = wall["offset"]
+		mesh.material_override = mat
+		root.add_child(mesh)
 
 
 func _build_floor_collider() -> void:

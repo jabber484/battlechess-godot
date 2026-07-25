@@ -40,6 +40,7 @@ func _build_tiles() -> void:
 	for entry in _cover_layout:
 		var tile: BattleTile = tiles[entry["pos"]]
 		tile.cover = entry["cover"]
+		tile.walkable = false
 
 
 func get_tile(grid_pos: Vector2i) -> BattleTile:
@@ -65,6 +66,26 @@ func get_cover(grid_pos: Vector2i) -> BattleEnums.Cover:
 	if tile == null:
 		return BattleEnums.Cover.NONE
 	return tile.cover
+
+
+## Cover on tiles adjacent to the defender, only toward the attacker.
+func get_directional_cover(defender_pos: Vector2i, attacker_pos: Vector2i) -> BattleEnums.Cover:
+	var dx := signi(attacker_pos.x - defender_pos.x)
+	var dy := signi(attacker_pos.y - defender_pos.y)
+	if dx == 0 and dy == 0:
+		return BattleEnums.Cover.NONE
+	var best: BattleEnums.Cover = BattleEnums.Cover.NONE
+	if dx != 0:
+		best = _max_cover(best, get_cover(defender_pos + Vector2i(dx, 0)))
+	if dy != 0:
+		best = _max_cover(best, get_cover(defender_pos + Vector2i(0, dy)))
+	if dx != 0 and dy != 0:
+		best = _max_cover(best, get_cover(defender_pos + Vector2i(dx, dy)))
+	return best
+
+
+func _max_cover(a: BattleEnums.Cover, b: BattleEnums.Cover) -> BattleEnums.Cover:
+	return a if int(a) >= int(b) else b
 
 
 func get_occupant(grid_pos: Vector2i) -> Unit:

@@ -13,6 +13,12 @@ func _init() -> void:
 	cost_slot = BattleEnums.CostSlot.ACTION
 
 
+func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
+	if not super.can_activate(unit, ctx):
+		return false
+	return not get_target_tiles(unit, ctx).is_empty()
+
+
 func tile_distance(a: Vector2i, b: Vector2i) -> int:
 	return GridMath.chebyshev(a, b)
 
