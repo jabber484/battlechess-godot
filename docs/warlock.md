@@ -251,7 +251,7 @@ Authoritative Overload effects still live in design/impl notes; player text only
 damage = floor(spent_drawn * damage_per_mana)
 ```
 
-Suggested default `damage_per_mana = 1.0` → 5 drawn ≈ 5 dmg, 20 ≈ 20. **Overload (prototype):** `floor(spent * damage_per_mana * 1.5)` — 150% damage. Tooltip Overload text unlocks when Draw bank first reaches `overload_threshold`.
+Suggested default `damage_per_mana = 2.0` → 5 drawn ≈ 10 dmg, 20 ≈ 40. **Overload (prototype):** `floor(spent * damage_per_mana * 1.5)` — 150% damage. Tooltip Overload text unlocks when Draw bank first reaches `overload_threshold`.
 
 Unit `damage` stat is **not** the primary lever for Charged Bolt; the Draw bank is.
 
@@ -374,7 +374,7 @@ Aggressive line: Fill the Draw bank past Overload threshold → Charged Bolt Ove
 | `draw_amount`        | 5        | Coarser steps if raised; finer if lowered     |
 | `mana_cost`          | 5        | Higher minimum commit to cast                 |
 | `overload_threshold` | 15       | Overload harder / easier (keep **&lt; cap**)  |
-| `damage_per_mana`    | 1.0      | Stronger payoff per committed point           |
+| `damage_per_mana`    | 2.0      | Stronger payoff per committed point           |
 | Fist Fight `damage`  | 8        | How hard the humiliation slap hits            |
 | Fist Fight miss      | 50%      | Raise = funnier / more useless when dry       |
 | Shield Overload turns| 3        | Longer multi-hit soak window (unit turns)     |

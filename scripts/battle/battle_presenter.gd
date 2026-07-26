@@ -234,7 +234,7 @@ func _enhance_draw(unit: Unit, execution: Dictionary) -> void:
 	var amount := int(execution.get("draw_amount", 0))
 	execution["present"] = func() -> void:
 		focus_grid_pos(unit.grid_pos)
-		await _host.get_tree().create_timer(0.5).timeout
+		await _host.get_tree().create_timer(0.18).timeout
 	if _battle_ui:
 		var prior_complete: Callable = execution.get("complete", Callable())
 		execution["complete"] = func() -> void:

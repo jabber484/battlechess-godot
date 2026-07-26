@@ -5,7 +5,7 @@ extends SimpleAttackAbilityData
 
 @export var mana_cost: int = 5
 @export var overload_threshold: int = 15
-@export var damage_per_mana: float = 1.0
+@export var damage_per_mana: float = 2.0
 @export var overload_damage_mult: float = 1.5
 
 var overload_unlocked: bool = false
