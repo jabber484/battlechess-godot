@@ -98,17 +98,17 @@ Stamina is a single pool (`BattleEnums.UnitResource.STAMINA`).
 
 | Event           | Amount                  | Source                                              |
 | --------------- | ----------------------- | --------------------------------------------------- |
-| Own turn starts | **+10** (capped at max) | `WarriorStaminaRechargeAbilityData.recharge_amount` |
+| Own turn starts | **+30** (capped at max) | `WarriorStaminaRechargeAbilityData.recharge_amount` |
 | Battle start    | Full (`max_resource`)   | `Unit.setup`                                        |
 
 ### Soft caps & feel
 
 - Full stamina ≈ **5 melee attacks** with no soak, or **50 HP** fully absorbed with no attacks.
-- Recharge (+10/turn) ≈ **one free attack per turn** if the Warrior never soaks — or partial recovery after soaking.
+- Recharge (+30/turn) ≈ **Melee cost (10) plus leftover for shield soak** — attack and still defend in the same turn cycle.
 - Empty stamina → **cannot** Melee or Reckless; shield does nothing until recharge (or future restore tools).
 - Overhead HUD shows an amber resource bar under HP when the unit has a resource.
 
-**Design tension:** attacking empties the shield; soaking empties the attack budget. Standing still and tanking is viable until stamina runs dry; then the Warrior must disengage or die.
+**Design tension:** heavy soak or Reckless still drains the pool faster than recharge; standing still and tanking is viable until stamina runs dry.
 
 ---
 
@@ -177,7 +177,7 @@ Misses never reach this path. Cover still only affects hit chance, not damage or
 
 ### Stamina Recharge — `warrior_stamina_recharge` (passive)
 
-On the unit’s turn start (`Unit.notify_turn_started` → `on_turn_started`): gain `recharge_amount` stamina (default 10), clamped to max.
+On the unit’s turn start (`Unit.notify_turn_started` → `on_turn_started`): gain `recharge_amount` stamina (default 30), clamped to max. Intent: cover a Melee spend and still leave stamina for shield soak.
 
 ---
 
@@ -193,7 +193,7 @@ Typical loop:
 1. Move into melee (or wait for enemies to approach)
 2. Melee for 30 damage (−10 stamina)
 3. Eat return fire (−stamina via shield)
-4. Next turn: +10 stamina, repeat or fall back if empty
+4. Next turn: +30 stamina, repeat or fall back if empty
 
 ---
 
@@ -227,7 +227,7 @@ Typical loop:
 | ----------------- | ------- | ---------------------------------------- |
 | `max_resource`    | 50      | Longer sustain / more consecutive swings |
 | `stamina_cost`    | 10      | Fewer attacks per pool                   |
-| `recharge_amount` | 10      | Stronger passive recovery                |
+| `recharge_amount` | 30      | Stronger passive recovery                |
 | `damage`          | 30      | Kill speed vs. glassier foes             |
 | `max_hp`          | 110     | Thin buffer after stamina is empty       |
 | `move_range`      | 4       | Ease of closing / escaping               |
