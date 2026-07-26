@@ -19,6 +19,8 @@ func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
 			return unit.can_move_more()
 		BattleEnums.CostSlot.ACTION:
 			return unit.can_act_more()
+		BattleEnums.CostSlot.NONE:
+			return true
 		_:
 			return false
 

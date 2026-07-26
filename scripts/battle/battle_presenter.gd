@@ -57,6 +57,8 @@ func enhance_execution(
 			_enhance_move(unit, target_pos, execution)
 		BattleEnums.Presentation.ATTACK:
 			_enhance_attack(unit, execution)
+		BattleEnums.Presentation.RECKLESS_ATTACK:
+			_enhance_reckless_attack(unit, execution)
 	return execution
 
 
@@ -122,6 +124,72 @@ func _enhance_attack(unit: Unit, execution: Dictionary) -> void:
 			)
 		await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
 		focus_grid_pos(unit.grid_pos)
+
+
+func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
+	var defender = execution.get("defender", null)
+	if not defender is Unit:
+		return
+	var target: Unit = defender as Unit
+	var warrior_falloff := int(execution.get("distance_penalty_per_tile", 0))
+	var warrior_range := int(execution.get("attack_range", 1))
+	var retal_range := int(execution.get("retaliation_attack_range", 0))
+	var retal_falloff := int(execution.get("retaliation_distance_penalty_per_tile", 0))
+
+	execution["present"] = func() -> void:
+		focus_grid_pos(target.grid_pos)
+		await _host.get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
+		if _combat_system == null:
+			return
+
+		# Enemy strikes first (interrupt — no turn/action budget).
+		if (
+			retal_range > 0
+			and target.is_alive()
+			and unit.is_alive()
+			and GridMath.chebyshev(target.grid_pos, unit.grid_pos) <= retal_range
+		):
+			_combat_system.commit_attack(
+				target,
+				unit,
+				retal_falloff,
+				retal_range,
+				false,
+				false,
+			)
+			await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
+
+		# Warrior swing if still able (owns turn, free action — no ACTION budget).
+		if (
+			unit.is_alive()
+			and target.is_alive()
+			and GridMath.chebyshev(unit.grid_pos, target.grid_pos) <= warrior_range
+		):
+			focus_grid_pos(target.grid_pos)
+			_combat_system.commit_attack(
+				unit,
+				target,
+				warrior_falloff,
+				warrior_range,
+				false,
+				true,
+			)
+			await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
+
+		focus_grid_pos(unit.grid_pos)
+
+	if _battle_ui:
+		var prior_complete: Callable = execution.get("complete", Callable())
+		execution["complete"] = func() -> void:
+			if prior_complete.is_valid():
+				prior_complete.call()
+			_battle_ui.append_log(
+				"%s recklessly attacks %s (enemy strikes first)" % [
+					unit.display_name,
+					target.display_name,
+				],
+				_log_color_for(unit),
+			)
 
 
 func _tween_along_path(unit: Unit, path: Array[Vector2i]) -> void:

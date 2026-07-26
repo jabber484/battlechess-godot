@@ -247,8 +247,7 @@ func notify_turn_started() -> void:
 	for ability in abilities:
 		if ability == null:
 			continue
-		if ability.category != BattleEnums.AbilityCategory.PASSIVE:
-			continue
+		# Passives (recharge, etc.) and ACTION kits with per-turn state (e.g. Reckless).
 		ability.on_turn_started(self)
 
 

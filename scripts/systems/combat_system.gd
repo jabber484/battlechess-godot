@@ -100,18 +100,26 @@ func cover_penalty_between(attacker_pos: Vector2i, defender_pos: Vector2i) -> in
 	return _penalty_for_cover(grid_system.get_directional_cover(defender_pos, attacker_pos))
 
 
+## Turn gates for commit_attack:
+## - require_action: attacker must own the turn and have an ACTION remaining (normal attacks)
+## - require_own_turn: attacker must own the turn (free-action attacks like Reckless)
+## - interrupt: no turn/action budget checks (retaliation mid-exchange)
 func commit_attack(
 	attacker: Unit,
 	defender: Unit,
 	distance_penalty_per_tile: int,
 	max_range: int,
+	require_action: bool = true,
+	require_own_turn: bool = true,
 ) -> Dictionary:
 	var result := {
 		"hit": false,
 		"damage": 0,
 		"hit_chance": 0,
 	}
-	if not _validate_attack(attacker, defender, true, max_range):
+	if not _validate_attack(
+		attacker, defender, true, max_range, require_action, require_own_turn
+	):
 		return result
 	var chance := compute_hit_chance(attacker, defender, distance_penalty_per_tile)
 	result["hit_chance"] = chance
@@ -130,6 +138,8 @@ func _validate_attack(
 	defender: Unit,
 	for_commit: bool,
 	max_range: int,
+	require_action: bool = true,
+	require_own_turn: bool = true,
 ) -> bool:
 	if attacker == null or defender == null:
 		return false
@@ -137,11 +147,13 @@ func _validate_attack(
 		return false
 	if attacker.team == defender.team:
 		return false
-	if turn_manager:
-		if for_commit:
-			if not turn_manager.owns_turn(attacker) or not attacker.can_act_more():
-				return false
-		elif not turn_manager.can_act(attacker):
+	if turn_manager and for_commit:
+		if require_own_turn and not turn_manager.owns_turn(attacker):
+			return false
+		if require_action and not attacker.can_act_more():
+			return false
+	elif turn_manager and not for_commit:
+		if not turn_manager.can_act(attacker):
 			return false
 	return GridMath.chebyshev(attacker.grid_pos, defender.grid_pos) <= max_range
 

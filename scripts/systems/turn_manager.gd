@@ -18,6 +18,8 @@ var turn_queue: Array[Unit] = []
 
 var _units: Array[Unit] = []
 var _busy: bool = false
+## Optional: return true to keep the turn open (e.g. any ability still can_activate).
+var keep_turn_open_check: Callable = Callable()
 
 
 func _ready() -> void:
@@ -47,7 +49,6 @@ func notify_moved(unit: Unit) -> void:
 		return
 	unit.moves_used += 1
 	unit_flags_changed.emit(unit)
-	_try_auto_finish()
 
 
 func notify_acted(unit: Unit) -> void:
@@ -55,7 +56,6 @@ func notify_acted(unit: Unit) -> void:
 		return
 	unit.actions_used += 1
 	unit_flags_changed.emit(unit)
-	_try_auto_finish()
 
 
 func request_end_turn() -> void:
@@ -166,8 +166,19 @@ func _advance_queue() -> void:
 
 
 func _try_auto_finish() -> void:
-	if active_unit and not active_unit.can_move_more() and not active_unit.can_act_more():
-		finish_turn()
+	if active_unit == null:
+		return
+	if keep_turn_open_check.is_valid() and bool(keep_turn_open_check.call(active_unit)):
+		return
+	# Fallback when no check is wired: end when move and action budgets are spent.
+	if active_unit.can_move_more() or active_unit.can_act_more():
+		return
+	finish_turn()
+
+
+## Call after an ability fully resolves (when not busy) so remaining abilities can keep the turn open.
+func request_auto_finish() -> void:
+	_try_auto_finish()
 
 
 func _set_phase(p: BattleEnums.TurnPhase) -> void:

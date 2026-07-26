@@ -47,7 +47,7 @@ UnitStats
   └── abilities[]
         ├── SimpleMoveAbilityData          (Walk)
         ├── WarriorBasicAttackAbilityData  (Melee)
-        ├── WarriorRecklessAttackAbilityData (Reckless — free action, costs stamina; enemy hits first)  _(design)_
+        ├── WarriorRecklessAttackAbilityData (Reckless — free action, costs stamina; enemy hits first)
         ├── WarriorStaminaShieldAbilityData (passive)
         └── WarriorStaminaRechargeAbilityData (passive)
 ```
@@ -131,7 +131,7 @@ Shared move ability. Uses pathfinding + Chebyshev neighbors. Costs the **move** 
 
 `can_activate` requires: action available, stamina, and at least one living enemy in range that is not in full cover. Half cover is still a valid melee target (hit chance reduced as usual).
 
-### Reckless Attack — `warrior_reckless_attack` _(design — not implemented)_
+### Reckless Attack — `warrior_reckless_attack`
 
 Bonus melee on your turn: **does not use the ACTION slot** (`cost_slot = NONE`), but **costs stamina** like Melee. You also pay by letting the enemy **strike first**.
 
@@ -160,6 +160,7 @@ Bonus melee on your turn: **does not use the ACTION slot** (`cost_slot = NONE`),
 - If the target cannot legally attack the Warrior (e.g. their only attack is out of range), **lean:** skip retaliation and still allow the Warrior swing (rare). Alternate: require a valid retaliator and disable the ability otherwise.
 - Retaliation should not consume the enemy’s turn / action budget — it’s an interrupt strike, not their turn.
 - **Once per own turn:** hard rule. Track a used flag on the ability instance; clear on the Warrior’s turn start. Cannot Reckless twice in one turn even with leftover stamina.
+- **Turn auto-end:** Do not end the turn while **any** non-passive ability still `can_activate` (Move, Melee, Reckless, …). Auto-end only when nothing remains usable.
 
 ### Stamina Shield — `warrior_stamina_shield` (passive)
 
@@ -196,7 +197,7 @@ Typical loop:
 
 ## Player & AI notes
 
-- **Player:** Ability-first UI lists non-passives (Walk, Melee, Reckless when shipped). Melee / Reckless disable when out of range or out of stamina; Reckless also disables after one use until the Warrior’s next turn start. Reckless does not require an available ACTION.
+- **Player:** Ability-first UI lists non-passives (Walk, Melee, Reckless). Melee / Reckless disable when out of range or out of stamina; Reckless also disables after one use until the Warrior’s next turn start. Reckless does not require an available ACTION.
 - **AI:** Resolves by category + `can_activate` / `is_valid_target`; first matching ability wins. Warrior AI currently uses the same generic heuristics as other units — no dedicated “preserve stamina” or “when to Reckless” policy yet.
 
 ---
@@ -207,7 +208,7 @@ Typical loop:
 | ------------------- | ---------------------------------------------------------------- |
 | Spawn / stats / kit | `scripts/data/default_battle_setup.gd` → `_make_warrior_stats()` |
 | Melee               | `scripts/abilities/warrior_basic_attack_ability_data.gd`         |
-| Reckless _(planned)_| `scripts/abilities/warrior_reckless_attack_ability_data.gd`      |
+| Reckless            | `scripts/abilities/warrior_reckless_attack_ability_data.gd`      |
 | Shield              | `scripts/abilities/warrior_stamina_shield_ability_data.gd`       |
 | Recharge            | `scripts/abilities/warrior_stamina_recharge_ability_data.gd`     |
 | Resource API        | `scripts/units/unit.gd`                                          |
@@ -244,7 +245,7 @@ Not required for the current prototype kit:
 - Equipment / progression that modifies the kit
 - Alternate resources on the same unit (one `resource_id` for now)
 
-Possible later abilities that still fit the fantasy: shove, taunt/mark, spend stamina for a burst hit, or a once-per-battle full refill — all as additional `AbilityData` entries, not Unit subclasses. **Reckless Attack** is specified above and waiting on implementation.
+Possible later abilities that still fit the fantasy: shove, taunt/mark, spend stamina for a burst hit, or a once-per-battle full refill — all as additional `AbilityData` entries, not Unit subclasses.
 
 ---
 
@@ -255,7 +256,7 @@ Possible later abilities that still fit the fantasy: shove, taunt/mark, spend st
 - [x] Shield soaks HP damage 1:1 with stamina
 - [x] Recharges stamina at turn start
 - [x] Overhead HUD shows HP + stamina
-- [ ] Reckless Attack: free action (`NONE`), costs stamina (10); enemy retaliates first; Warrior hits if still able
-- [ ] Reckless once per own turn (flag cleared on turn start)
+- [x] Reckless Attack: free action (`NONE`), costs stamina (10); enemy retaliates first; Warrior hits if still able
+- [x] Reckless once per own turn (flag cleared on turn start)
 - [ ] Tuned encounter where empty-stamina failure is readable
 - [ ] AI respects stamina scarcity (optional)

@@ -44,6 +44,7 @@ func _ready() -> void:
 		unit.resource_changed.connect(_on_unit_resource_changed)
 	battle_state.register_units(_units)
 	turn_manager.register_units(_units)
+	turn_manager.keep_turn_open_check = _unit_has_available_ability
 	turn_manager.start_battle()
 	battle_ui.append_log("Battle started", Color(0.7, 0.9, 1.0))
 
@@ -286,12 +287,16 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 			typed_death.append(u as Unit)
 
 	await action_runner.run(commit, present, complete, typed_death)
+	# Free-action abilities do not call notify_acted/moved — still try auto-end after them.
+	turn_manager.request_auto_finish()
 	_pending_attack_target = null
 	if _selected_ability and not _selected_ability.can_activate(unit, _ability_ctx):
 		_selected_ability = null
 	_refresh_ability_bar()
 	_refresh_highlights()
 	if unit.is_player() and not battle_state.is_over():
+		if turn_manager.active_unit != unit:
+			return
 		if _selected_ability:
 			battle_ui.set_status("Selected %s — choose a target" % _selected_ability.display_name)
 		else:
@@ -309,6 +314,19 @@ func _player_abilities(unit: Unit) -> Array[AbilityData]:
 			continue
 		result.append(ability)
 	return result
+
+
+func _unit_has_available_ability(unit: Unit) -> bool:
+	if unit == null or _ability_ctx == null:
+		return false
+	for ability in unit.abilities:
+		if ability == null:
+			continue
+		if ability.category == BattleEnums.AbilityCategory.PASSIVE:
+			continue
+		if ability.can_activate(unit, _ability_ctx):
+			return true
+	return false
 
 
 func _refresh_ability_bar() -> void:

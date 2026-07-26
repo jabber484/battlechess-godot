@@ -17,7 +17,7 @@ alwaysApply: false
 
 - Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION` | `PASSIVE`), `cost_slot` (`MOVE` → `notify_moved`, `ACTION` → `notify_acted`, `NONE` for passives)
 - Methods: `can_activate(unit, ctx)`, `get_target_tiles(unit, ctx)`, `is_valid_target(unit, target_pos, ctx)`, `build_execution(unit, target_pos, ctx) -> Dictionary` (`commit` / `present` / `complete` / `death_units`)
-- Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` and/or `on_turn_started(unit)` when needed. `Unit.modify_incoming_damage` / `Unit.notify_turn_started` dispatch to `PASSIVE` abilities.
+- Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` and/or `on_turn_started(unit)` when needed. `Unit.modify_incoming_damage` dispatches to `PASSIVE` abilities; `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities (passives and per-turn ACTION state).
 - Use `AbilityContext` for system refs (`pathfinding`, `grid_system`, `turn_manager`, `battle_state`, `combat_system`). Abilities must not cache Node paths.
 - Execution may include intent for presentation: `presentation` (`BattleEnums.Presentation`), plus `path` / `defender`. Leave `present` empty so `BattlePresenter` fills camera/tweens. Do not reference `CameraRig` from abilities.
 
@@ -44,8 +44,13 @@ Standard abilities:
 - Walk: `SimpleMoveAbilityData` (`id = &"simple_move"`)
 - Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`)
 - Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost, extends simple attack; cannot target directional full cover
+- Warrior reckless: `WarriorRecklessAttackAbilityData` (`id = &"warrior_reckless_attack"`) — free action (`CostSlot.NONE`), stamina cost, once per turn; enemy retaliates first then Warrior hits
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
+- `CostSlot.NONE`: free abilities (no move/action budget); `can_activate` still requires owning the turn
+- `CombatSystem.commit_attack(..., require_action, require_own_turn)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation
+- `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities (passives and per-turn ACTION state)
+- Turn auto-end (`TurnManager._try_auto_finish`) stays open while **any** non-passive ability `can_activate` (wired via `keep_turn_open_check`)
 
 ## Out of scope reminders
 
