@@ -11,6 +11,7 @@ func _init() -> void:
 	category = BattleEnums.AbilityCategory.ACTION
 	cost_slot = BattleEnums.CostSlot.NONE
 	attack_range = 1
+	range_metric = BattleEnums.RangeMetric.CHEBYSHEV
 	stamina_cost = 10
 
 
@@ -45,10 +46,12 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 	var warrior_falloff := distance_penalty_per_tile
 	var retal_range := 0
 	var retal_falloff := 0
+	var retal_metric := BattleEnums.RangeMetric.CHEBYSHEV
 	var retal_attack := _find_attack_ability(defender)
 	if retal_attack != null:
 		retal_range = retal_attack.attack_range
 		retal_falloff = retal_attack.distance_penalty_per_tile
+		retal_metric = retal_attack.range_metric
 
 	return {
 		"commit": func() -> bool:
@@ -65,8 +68,10 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 		"presentation": BattleEnums.Presentation.RECKLESS_ATTACK,
 		"distance_penalty_per_tile": warrior_falloff,
 		"attack_range": warrior_range,
+		"range_metric": range_metric,
 		"retaliation_attack_range": retal_range,
 		"retaliation_distance_penalty_per_tile": retal_falloff,
+		"retaliation_range_metric": retal_metric,
 	}
 
 

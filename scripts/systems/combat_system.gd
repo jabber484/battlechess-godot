@@ -18,21 +18,36 @@ func _ready() -> void:
 	turn_manager = get_node(turn_manager_path) as TurnManager
 
 
-func can_attack(attacker: Unit, defender: Unit, max_range: int) -> bool:
-	return _validate_attack(attacker, defender, false, max_range)
+func can_attack(
+	attacker: Unit,
+	defender: Unit,
+	max_range: int,
+	range_metric: BattleEnums.RangeMetric = BattleEnums.RangeMetric.CHEBYSHEV,
+) -> bool:
+	return _validate_attack(attacker, defender, false, max_range, true, true, range_metric)
 
 
-func get_attackable_units(attacker: Unit, units: Array[Unit], max_range: int) -> Array[Unit]:
+func get_attackable_units(
+	attacker: Unit,
+	units: Array[Unit],
+	max_range: int,
+	range_metric: BattleEnums.RangeMetric = BattleEnums.RangeMetric.CHEBYSHEV,
+) -> Array[Unit]:
 	var result: Array[Unit] = []
 	for unit in units:
-		if can_attack(attacker, unit, max_range):
+		if can_attack(attacker, unit, max_range, range_metric):
 			result.append(unit)
 	return result
 
 
-func get_attackable_tiles(attacker: Unit, units: Array[Unit], max_range: int) -> Array[Vector2i]:
+func get_attackable_tiles(
+	attacker: Unit,
+	units: Array[Unit],
+	max_range: int,
+	range_metric: BattleEnums.RangeMetric = BattleEnums.RangeMetric.CHEBYSHEV,
+) -> Array[Vector2i]:
 	var tiles: Array[Vector2i] = []
-	for unit in get_attackable_units(attacker, units, max_range):
+	for unit in get_attackable_units(attacker, units, max_range, range_metric):
 		tiles.append(unit.grid_pos)
 	return tiles
 
@@ -41,8 +56,9 @@ func compute_hit_chance(
 	attacker: Unit,
 	defender: Unit,
 	distance_penalty_per_tile: int = 0,
+	range_metric: BattleEnums.RangeMetric = BattleEnums.RangeMetric.CHEBYSHEV,
 ) -> int:
-	return int(explain_hit_chance(attacker, defender, distance_penalty_per_tile)["chance"])
+	return int(explain_hit_chance(attacker, defender, distance_penalty_per_tile, range_metric)["chance"])
 
 
 ## Accuracy, distance, and cover terms that feed `compute_hit_chance`.
@@ -50,11 +66,12 @@ func explain_hit_chance(
 	attacker: Unit,
 	defender: Unit,
 	distance_penalty_per_tile: int = 0,
+	range_metric: BattleEnums.RangeMetric = BattleEnums.RangeMetric.CHEBYSHEV,
 ) -> Dictionary:
-	var distance := GridMath.chebyshev(attacker.grid_pos, defender.grid_pos)
+	var distance := GridMath.range_distance(attacker.grid_pos, defender.grid_pos, range_metric)
 	## Falloff starts after adjacent (distance 1): penalty uses (N - 1) tiles.
-	var distance_steps := maxi(0, distance - 1)
-	var distance_penalty := distance_steps * distance_penalty_per_tile
+	var distance_steps := maxf(0.0, distance - 1.0)
+	var distance_penalty := int(round(distance_steps * float(distance_penalty_per_tile)))
 	var cover: BattleEnums.Cover = grid_system.get_directional_cover(
 		defender.grid_pos, attacker.grid_pos
 	)
@@ -77,11 +94,17 @@ func format_hit_chance(breakdown: Dictionary) -> String:
 	parts.append("%d base" % int(breakdown["accuracy"]))
 	var distance_penalty: int = int(breakdown["distance_penalty"])
 	if distance_penalty > 0:
+		var steps: float = float(breakdown["distance_steps"])
+		var steps_label := (
+			"%d" % int(round(steps))
+			if is_equal_approx(steps, round(steps))
+			else "%.1f" % steps
+		)
 		parts.append(
-			"−%d dist (%d×%d)"
+			"−%d dist (%s×%d)"
 			% [
 				distance_penalty,
-				int(breakdown["distance_steps"]),
+				steps_label,
 				int(breakdown["distance_penalty_per_tile"]),
 			]
 		)
@@ -113,6 +136,7 @@ func commit_attack(
 	require_own_turn: bool = true,
 	damage_override: int = -1,
 	hit_chance_override: int = -1,
+	range_metric: BattleEnums.RangeMetric = BattleEnums.RangeMetric.CHEBYSHEV,
 ) -> Dictionary:
 	var result := {
 		"hit": false,
@@ -120,13 +144,13 @@ func commit_attack(
 		"hit_chance": 0,
 	}
 	if not _validate_attack(
-		attacker, defender, true, max_range, require_action, require_own_turn
+		attacker, defender, true, max_range, require_action, require_own_turn, range_metric
 	):
 		return result
 	var chance := (
 		clampi(hit_chance_override, 5, 100)
 		if hit_chance_override >= 0
-		else compute_hit_chance(attacker, defender, distance_penalty_per_tile)
+		else compute_hit_chance(attacker, defender, distance_penalty_per_tile, range_metric)
 	)
 	result["hit_chance"] = chance
 	var roll := randi_range(1, 100)
@@ -147,6 +171,7 @@ func _validate_attack(
 	max_range: int,
 	require_action: bool = true,
 	require_own_turn: bool = true,
+	range_metric: BattleEnums.RangeMetric = BattleEnums.RangeMetric.CHEBYSHEV,
 ) -> bool:
 	if attacker == null or defender == null:
 		return false
@@ -162,7 +187,9 @@ func _validate_attack(
 	elif turn_manager and not for_commit:
 		if not turn_manager.can_act(attacker):
 			return false
-	return GridMath.chebyshev(attacker.grid_pos, defender.grid_pos) <= max_range
+	return GridMath.is_within_range(
+		attacker.grid_pos, defender.grid_pos, float(max_range), range_metric
+	)
 
 
 func _penalty_for_cover(cover: BattleEnums.Cover) -> int:

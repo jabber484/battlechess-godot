@@ -110,11 +110,13 @@ func run_unit_turn(unit: Unit) -> void:
 				unit,
 				a,
 				_distance_penalty_for_target(unit, a, ctx),
+				_range_metric_for_target(unit, a, ctx),
 			)
 			var cb := combat_system.compute_hit_chance(
 				unit,
 				b,
 				_distance_penalty_for_target(unit, b, ctx),
+				_range_metric_for_target(unit, b, ctx),
 			)
 			if ca != cb:
 				return ca > cb
@@ -130,14 +132,15 @@ func run_unit_turn(unit: Unit) -> void:
 
 func _score_tile(unit: Unit, tile: Vector2i, players: Array[Unit]) -> int:
 	var score := 0
-	var nearest := 999
+	var nearest := 999.0
 	var can_shoot_from_here := false
 	var distance_penalty_per_tile := _primary_attack_distance_penalty(unit)
-	var max_range := _primary_attack_range(unit)
+	var max_range := float(_primary_attack_range(unit))
+	var range_metric := _primary_attack_range_metric(unit)
 	var best_self_cover_bonus := 0
 	for player in players:
-		var dist := GridMath.chebyshev(tile, player.grid_pos)
-		nearest = mini(nearest, dist)
+		var dist := GridMath.range_distance(tile, player.grid_pos, range_metric)
+		nearest = minf(nearest, dist)
 		match grid_system.get_directional_cover(tile, player.grid_pos):
 			BattleEnums.Cover.HALF:
 				best_self_cover_bonus = maxi(best_self_cover_bonus, 15)
@@ -145,14 +148,14 @@ func _score_tile(unit: Unit, tile: Vector2i, players: Array[Unit]) -> int:
 				best_self_cover_bonus = maxi(best_self_cover_bonus, 30)
 			_:
 				pass
-		if dist <= max_range:
+		if GridMath.is_within_range(tile, player.grid_pos, max_range, range_metric):
 			can_shoot_from_here = true
-			var distance_penalty := maxi(0, dist - 1) * distance_penalty_per_tile
+			var distance_penalty := int(round(maxf(0.0, dist - 1.0) * float(distance_penalty_per_tile)))
 			var cover_penalty: int = combat_system.cover_penalty_between(tile, player.grid_pos)
 			var chance := clampi(unit.accuracy - distance_penalty - cover_penalty, 5, 100)
 			score += 40 + chance / 2
 			score += maxi(0, 40 - player.current_hp / 3)
-	score += maxi(0, 20 - nearest * 2)
+	score += maxi(0, 20 - int(round(nearest)) * 2)
 	score += best_self_cover_bonus
 	if can_shoot_from_here:
 		score += 25
@@ -181,6 +184,13 @@ func _primary_attack_range(unit: Unit) -> int:
 	return 0
 
 
+func _primary_attack_range_metric(unit: Unit) -> BattleEnums.RangeMetric:
+	for ability in unit.get_abilities_by_category(BattleEnums.AbilityCategory.ACTION):
+		if ability is SimpleAttackAbilityData:
+			return (ability as SimpleAttackAbilityData).range_metric
+	return BattleEnums.RangeMetric.CHEBYSHEV
+
+
 func _distance_penalty_for_target(unit: Unit, target: Unit, ctx: AbilityContext) -> int:
 	var ability := unit.resolve_ability(
 		BattleEnums.AbilityCategory.ACTION,
@@ -190,3 +200,14 @@ func _distance_penalty_for_target(unit: Unit, target: Unit, ctx: AbilityContext)
 	if ability is SimpleAttackAbilityData:
 		return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
 	return 0
+
+
+func _range_metric_for_target(unit: Unit, target: Unit, ctx: AbilityContext) -> BattleEnums.RangeMetric:
+	var ability := unit.resolve_ability(
+		BattleEnums.AbilityCategory.ACTION,
+		target.grid_pos,
+		ctx,
+	)
+	if ability is SimpleAttackAbilityData:
+		return (ability as SimpleAttackAbilityData).range_metric
+	return BattleEnums.RangeMetric.CHEBYSHEV

@@ -119,6 +119,9 @@ func _enhance_attack(unit: Unit, execution: Dictionary) -> void:
 	var target: Unit = defender as Unit
 	var distance_penalty_per_tile := int(execution.get("distance_penalty_per_tile", 0))
 	var max_range := int(execution.get("attack_range", 0))
+	var range_metric: BattleEnums.RangeMetric = execution.get(
+		"range_metric", BattleEnums.RangeMetric.CHEBYSHEV
+	) as BattleEnums.RangeMetric
 	var hit_chance_override := int(execution.get("hit_chance_override", -1))
 	var damage_resolver: Variant = execution.get("damage_resolver", null)
 	execution["present"] = func() -> void:
@@ -139,6 +142,7 @@ func _enhance_attack(unit: Unit, execution: Dictionary) -> void:
 				true,
 				damage_override,
 				hit_chance_override,
+				range_metric,
 			)
 		await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
 		focus_grid_pos(unit.grid_pos)
@@ -151,8 +155,14 @@ func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
 	var target: Unit = defender as Unit
 	var warrior_falloff := int(execution.get("distance_penalty_per_tile", 0))
 	var warrior_range := int(execution.get("attack_range", 1))
+	var warrior_metric: BattleEnums.RangeMetric = execution.get(
+		"range_metric", BattleEnums.RangeMetric.CHEBYSHEV
+	) as BattleEnums.RangeMetric
 	var retal_range := int(execution.get("retaliation_attack_range", 0))
 	var retal_falloff := int(execution.get("retaliation_distance_penalty_per_tile", 0))
+	var retal_metric: BattleEnums.RangeMetric = execution.get(
+		"retaliation_range_metric", BattleEnums.RangeMetric.CHEBYSHEV
+	) as BattleEnums.RangeMetric
 
 	execution["present"] = func() -> void:
 		focus_grid_pos(target.grid_pos)
@@ -165,7 +175,9 @@ func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
 			retal_range > 0
 			and target.is_alive()
 			and unit.is_alive()
-			and GridMath.chebyshev(target.grid_pos, unit.grid_pos) <= retal_range
+			and GridMath.is_within_range(
+				target.grid_pos, unit.grid_pos, float(retal_range), retal_metric
+			)
 		):
 			_combat_system.commit_attack(
 				target,
@@ -174,6 +186,9 @@ func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
 				retal_range,
 				false,
 				false,
+				-1,
+				-1,
+				retal_metric,
 			)
 			await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
 
@@ -181,7 +196,9 @@ func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
 		if (
 			unit.is_alive()
 			and target.is_alive()
-			and GridMath.chebyshev(unit.grid_pos, target.grid_pos) <= warrior_range
+			and GridMath.is_within_range(
+				unit.grid_pos, target.grid_pos, float(warrior_range), warrior_metric
+			)
 		):
 			focus_grid_pos(target.grid_pos)
 			_combat_system.commit_attack(
@@ -191,6 +208,9 @@ func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
 				warrior_range,
 				false,
 				true,
+				-1,
+				-1,
+				warrior_metric,
 			)
 			await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
 
@@ -243,11 +263,12 @@ func _enhance_self_buff(unit: Unit, execution: Dictionary) -> void:
 				spent = int(spent_holder.get("spent", 0))
 				overload = bool(spent_holder.get("overload", false))
 			var mode := "Overload" if overload else "raised"
-			var detail := (
-				"up to %d unit turns / until own turn" % 3
-				if overload
-				else "blocks 1 hit"
-			)
+			var detail := "up to 3 unit turns / until own turn"
+			if not overload:
+				var block_charges: int = int(spent_holder.get("charges", 0)) if typeof(spent_holder) == TYPE_DICTIONARY else 0
+				if block_charges <= 0:
+					block_charges = maxi(1, int(spent / 5))
+				detail = "blocks %d hit%s" % [block_charges, "" if block_charges == 1 else "s"]
 			_battle_ui.append_log(
 				"%s %s Mana Shield (%s, spent %d)" % [unit.display_name, mode, detail, spent],
 				_log_color_for(unit),

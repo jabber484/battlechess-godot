@@ -17,6 +17,7 @@ func _init() -> void:
 	category = BattleEnums.AbilityCategory.ACTION
 	cost_slot = BattleEnums.CostSlot.ACTION
 	attack_range = 4
+	range_metric = BattleEnums.RangeMetric.EUCLIDEAN
 	distance_penalty_per_tile = 5
 
 

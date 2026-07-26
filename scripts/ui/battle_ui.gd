@@ -3,6 +3,8 @@ extends CanvasLayer
 
 signal end_turn_pressed
 signal ability_selected(ability: AbilityData)
+signal ability_hovered(ability: AbilityData)
+signal ability_unhovered(ability: AbilityData)
 
 @onready var round_label: Label = %RoundLabel
 @onready var initiative_bar: HBoxContainer = %InitiativeBar
@@ -139,12 +141,18 @@ func set_abilities(
 			var draw: WarlockDrawManaAbilityData = ability as WarlockDrawManaAbilityData
 			button.text = "Draw (%d/%d)" % [draw.drawn_mana, draw.max_drawn_mana]
 		button.custom_minimum_size = Vector2(120, 36)
-		button.disabled = not bool(is_activatable.call(ability))
+		var can_use := bool(is_activatable.call(ability))
+		# Keep mouse events for range preview even when the ability can't be used yet.
+		button.disabled = false
+		button.modulate = Color.WHITE if can_use else Color(0.55, 0.55, 0.58, 0.9)
+		button.set_meta("can_use", can_use)
 		if ability.has_method("get_tooltip_text"):
 			button.tooltip_text = str(ability.get_tooltip_text())
 		elif ability is WarlockDrawManaAbilityData:
 			button.tooltip_text = "Pull mana from the well into the Draw bank (free)."
 		button.pressed.connect(_on_ability_button_pressed.bind(ability))
+		button.mouse_entered.connect(_on_ability_button_hovered.bind(ability))
+		button.mouse_exited.connect(_on_ability_button_unhovered.bind(ability))
 		ability_bar.add_child(button)
 		_ability_buttons[ability] = button
 	set_selected_ability(selected)
@@ -155,10 +163,14 @@ func set_selected_ability(selected: AbilityData) -> void:
 		var button: Button = _ability_buttons[ability]
 		if not is_instance_valid(button):
 			continue
+		var can_use := true
+		if button.has_meta("can_use"):
+			can_use = bool(button.get_meta("can_use"))
+		var base := Color.WHITE if can_use else Color(0.55, 0.55, 0.58, 0.9)
 		if ability == selected:
-			button.modulate = Color(1.15, 1.05, 0.65)
+			button.modulate = Color(1.15, 1.05, 0.65) if can_use else Color(0.85, 0.75, 0.45, 0.9)
 		else:
-			button.modulate = Color.WHITE
+			button.modulate = base
 
 
 func show_battle_result(result: BattleEnums.BattleResult) -> void:
@@ -173,3 +185,11 @@ func show_battle_result(result: BattleEnums.BattleResult) -> void:
 
 func _on_ability_button_pressed(ability: AbilityData) -> void:
 	ability_selected.emit(ability)
+
+
+func _on_ability_button_hovered(ability: AbilityData) -> void:
+	ability_hovered.emit(ability)
+
+
+func _on_ability_button_unhovered(ability: AbilityData) -> void:
+	ability_unhovered.emit(ability)

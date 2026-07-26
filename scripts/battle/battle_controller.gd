@@ -22,6 +22,7 @@ const CombatSystemScript := preload("res://scripts/systems/combat_system.gd")
 var _units: Array[Unit] = []
 var _pending_attack_target: Unit = null
 var _selected_ability: AbilityData = null
+var _hovered_ability: AbilityData = null
 var _ability_ctx: AbilityContext
 var _presenter: BattlePresenterScript
 var _hovered_tile: Vector2i = Vector2i(-1, -1)
@@ -65,6 +66,8 @@ func _connect_signals() -> void:
 	battle_state.battle_ended.connect(_on_battle_ended)
 	battle_ui.end_turn_pressed.connect(_on_end_turn_pressed)
 	battle_ui.ability_selected.connect(_on_ability_selected)
+	battle_ui.ability_hovered.connect(_on_ability_hovered)
+	battle_ui.ability_unhovered.connect(_on_ability_unhovered)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -81,6 +84,7 @@ func _on_round_started(round_number: int) -> void:
 func _on_turn_started(unit: Unit) -> void:
 	_pending_attack_target = null
 	_selected_ability = null
+	_hovered_ability = null
 	_hovered_tile = Vector2i(-1, -1)
 	# Duration ticks on other units fire before the active unit's own turn-start hooks.
 	for other in _units:
@@ -110,6 +114,7 @@ func _on_turn_ended(unit: Unit) -> void:
 	if unit:
 		battle_ui.append_log("%s ended turn" % unit.display_name, _log_color_for(unit))
 	_selected_ability = null
+	_hovered_ability = null
 	_pending_attack_target = null
 	_hovered_tile = Vector2i(-1, -1)
 	battle_ui.clear_abilities()
@@ -207,11 +212,13 @@ func _on_ability_selected(ability: AbilityData) -> void:
 	if not ability.can_activate(active, _ability_ctx):
 		battle_ui.set_status("%s is not available" % ability.display_name)
 		_refresh_ability_bar()
+		_refresh_highlights()
 		return
 
 	# Self-targeted / instant abilities run on button click — no second confirm.
 	if ability.activates_on_select():
 		_selected_ability = null
+		_hovered_ability = null
 		_pending_attack_target = null
 		battle_ui.set_hit_chance("")
 		battle_ui.set_selected_ability(null)
@@ -220,6 +227,7 @@ func _on_ability_selected(ability: AbilityData) -> void:
 		return
 
 	_selected_ability = ability
+	_hovered_ability = null
 	_pending_attack_target = null
 	battle_ui.set_hit_chance("")
 	battle_ui.set_selected_ability(_selected_ability)
@@ -231,6 +239,23 @@ func _on_ability_selected(ability: AbilityData) -> void:
 			battle_ui.set_status("Selected %s — click a target" % ability.display_name)
 		_:
 			battle_ui.set_status("Selected %s" % ability.display_name)
+
+
+func _on_ability_hovered(ability: AbilityData) -> void:
+	if battle_state.is_over() or turn_manager.is_busy():
+		return
+	var active := turn_manager.active_unit
+	if active == null or not active.is_player() or ability == null:
+		return
+	_hovered_ability = ability
+	_refresh_highlights()
+
+
+func _on_ability_unhovered(ability: AbilityData) -> void:
+	if _hovered_ability != ability:
+		return
+	_hovered_ability = null
+	_refresh_highlights()
 
 
 func _on_tile_picked(grid_pos: Vector2i) -> void:
@@ -397,9 +422,11 @@ func _refresh_ability_bar() -> void:
 	var active := turn_manager.active_unit
 	if active == null or not active.is_player() or battle_state.is_over():
 		_selected_ability = null
+		_hovered_ability = null
 		battle_ui.clear_abilities()
 		return
 	if turn_manager.is_busy():
+		_hovered_ability = null
 		battle_ui.clear_abilities()
 		return
 	if _selected_ability and not _selected_ability.can_activate(active, _ability_ctx):
@@ -421,40 +448,83 @@ func _clear_selected_ability() -> void:
 	_refresh_highlights()
 
 
+func _preview_ability() -> AbilityData:
+	if _hovered_ability != null:
+		return _hovered_ability
+	return _selected_ability
+
+
 func _refresh_highlights() -> void:
 	grid_view.clear_highlights()
 	var active := turn_manager.active_unit
 	if active == null or not active.is_player() or battle_state.is_over():
 		battle_ui.set_hit_chance("")
 		return
-	if _selected_ability == null or not _selected_ability.can_activate(active, _ability_ctx):
+	var ability := _preview_ability()
+	if ability == null:
 		battle_ui.set_hit_chance("")
 		return
-	var tiles := _selected_ability.get_target_tiles(active, _ability_ctx)
-	if tiles.is_empty():
+	# Selected abilities still require can_activate; hover can preview range even if unusable.
+	var is_hover_preview := ability == _hovered_ability and ability != _selected_ability
+	if not is_hover_preview and not ability.can_activate(active, _ability_ctx):
 		battle_ui.set_hit_chance("")
 		return
-	match _selected_ability.category:
+
+	match ability.category:
 		BattleEnums.AbilityCategory.MOVE:
 			battle_ui.set_hit_chance("")
-			grid_view.show_reachable(tiles)
-			_refresh_move_hover_preview(active)
+			var move_tiles := ability.get_target_tiles(active, _ability_ctx)
+			if not move_tiles.is_empty():
+				grid_view.show_reachable(move_tiles)
+			if ability == _selected_ability:
+				_refresh_move_hover_preview(active)
 		BattleEnums.AbilityCategory.ACTION:
-			grid_view.show_attackable(tiles)
-			_refresh_attack_hover_preview(active)
+			_show_action_ability_highlights(active, ability)
+			if ability == _selected_ability:
+				_refresh_attack_hover_preview(active)
 		_:
-			grid_view.show_attackable(tiles)
-			_refresh_attack_hover_preview(active)
+			_show_action_ability_highlights(active, ability)
+
+
+func _show_action_ability_highlights(unit: Unit, ability: AbilityData) -> void:
+	if ability.activates_on_select() or ability.id == &"warlock_mana_shield" or ability.id == &"warlock_draw_mana":
+		grid_view.show_self_target(ability.get_target_tiles(unit, _ability_ctx))
+		battle_ui.set_hit_chance("")
+		return
+	var range_tiles := _attack_range_tiles(unit, ability)
+	if not range_tiles.is_empty():
+		grid_view.show_range(range_tiles)
+	var target_tiles := ability.get_target_tiles(unit, _ability_ctx)
+	if not target_tiles.is_empty():
+		grid_view.show_attackable(target_tiles)
+	if target_tiles.is_empty() and range_tiles.is_empty():
+		battle_ui.set_hit_chance("")
+
+
+func _attack_range_tiles(unit: Unit, ability: AbilityData) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	if unit == null or not (ability is SimpleAttackAbilityData):
+		return result
+	var attack := ability as SimpleAttackAbilityData
+	for x in GridMath.GRID_SIZE:
+		for y in GridMath.GRID_SIZE:
+			var pos := Vector2i(x, y)
+			if pos == unit.grid_pos:
+				continue
+			if attack.is_in_attack_range(unit.grid_pos, pos):
+				result.append(pos)
+	return result
 
 
 func _refresh_attack_hover_preview(unit: Unit) -> void:
-	if unit == null or _selected_ability == null:
+	var ability := _selected_ability
+	if unit == null or ability == null:
 		battle_ui.set_hit_chance("")
 		return
 	if not GridMath.is_in_bounds(_hovered_tile):
 		battle_ui.set_hit_chance("")
 		return
-	if not _selected_ability.is_valid_target(unit, _hovered_tile, _ability_ctx):
+	if not ability.is_valid_target(unit, _hovered_tile, _ability_ctx):
 		battle_ui.set_hit_chance("")
 		return
 	var defender := grid_system.get_occupant(_hovered_tile)
@@ -462,7 +532,7 @@ func _refresh_attack_hover_preview(unit: Unit) -> void:
 		battle_ui.set_hit_chance("")
 		return
 	grid_view.show_hover(_hovered_tile)
-	var text := _hit_chance_text(unit, defender, _selected_ability)
+	var text := _hit_chance_text(unit, defender, ability)
 	if _pending_attack_target == defender:
 		text = "%s — click again to confirm" % text
 	battle_ui.set_hit_chance(text)
@@ -473,7 +543,7 @@ func _hit_chance_text(attacker: Unit, defender: Unit, ability: AbilityData) -> S
 		var flat: int = (ability as WarlockFistFightAbilityData).flat_hit_chance
 		return "Hit %d%%: flat Fist Fight miss chance" % flat
 	var breakdown := combat_system.explain_hit_chance(
-		attacker, defender, _distance_penalty_per_tile(ability)
+		attacker, defender, _distance_penalty_per_tile(ability), _range_metric(ability)
 	)
 	var text := combat_system.format_hit_chance(breakdown)
 	if ability is WarlockChargedBoltAbilityData:
@@ -532,3 +602,9 @@ func _distance_penalty_per_tile(ability: AbilityData) -> int:
 	if ability is SimpleAttackAbilityData:
 		return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
 	return 0
+
+
+func _range_metric(ability: AbilityData) -> BattleEnums.RangeMetric:
+	if ability is SimpleAttackAbilityData:
+		return (ability as SimpleAttackAbilityData).range_metric
+	return BattleEnums.RangeMetric.CHEBYSHEV

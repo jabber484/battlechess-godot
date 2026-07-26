@@ -124,6 +124,7 @@ Shared move ability. Uses pathfinding with octile step costs (diagonal ≈ √2)
 | -------------------- | ---------------------------------------------------------------- |
 | Category / cost slot | `ACTION` / `ACTION`                                              |
 | `attack_range`       | **1** (adjacent including diagonal)                              |
+| `range_metric`       | **CHEBYSHEV** (melee — diagonals count as 1)                     |
 | Stamina gate         | `current_stamina >= stamina_cost` (default 10)                   |
 | Full cover           | **Cannot** target enemies with directional full cover vs warrior |
 | Distance falloff     | Inherited; at range 1, **(N−1)×rate = 0** so no distance penalty |
@@ -139,6 +140,7 @@ Bonus melee on your turn: **does not use the ACTION slot** (`cost_slot = NONE`),
 | -------------------- | ---------------------------------------------------------------- |
 | Category / cost slot | `ACTION` / **`NONE`** (free — does not spend move or action)     |
 | `attack_range`       | **1** (same as Melee — adjacent including diagonal)              |
+| `range_metric`       | **CHEBYSHEV**                                                    |
 | Stamina gate         | `current_stamina >= stamina_cost` (default **10**, same as Melee)|
 | Full cover           | Same as Melee — **cannot** target directional full cover         |
 | Distance falloff     | None at range 1                                                  |
@@ -181,7 +183,7 @@ On the unit’s turn start (`Unit.notify_turn_started` → `on_turn_started`): g
 
 ## Combat positioning
 
-- Range and adjacency use **Chebyshev** (see project grid rule): diagonals are distance 1.
+- Range and adjacency use **Chebyshev** (`range_metric = CHEBYSHEV`): diagonals are distance 1.
 - Warrior wants to stand next to targets; shooting units want space and cover.
 - Enemies in **full cover** from the Warrior’s approach are untargetable in melee — flank or wait them out.
 - Half/full cover still reduces _hit chance_ on valid shots against the Warrior; once a hit lands, stamina/HP absorb it — cover does not reduce damage.

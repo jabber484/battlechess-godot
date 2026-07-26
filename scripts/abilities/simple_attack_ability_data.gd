@@ -4,6 +4,9 @@ extends AbilityData
 @export var attack_range: int = 5
 ## Hit-chance reduction per tile beyond adjacent (distance uses N-1). 0 = no falloff.
 @export var distance_penalty_per_tile: int = 5
+## Reach geometry. EUCLIDEAN = ranged circle √(dx²+dy²); CHEBYSHEV = melee square (diagonals = 1).
+## Prefer `is_in_attack_range` over calling GridMath.chebyshev/euclidean directly. See abilities.mdc.
+@export var range_metric: BattleEnums.RangeMetric = BattleEnums.RangeMetric.EUCLIDEAN
 
 
 func _init() -> void:
@@ -19,8 +22,9 @@ func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
 	return not get_target_tiles(unit, ctx).is_empty()
 
 
-func tile_distance(a: Vector2i, b: Vector2i) -> int:
-	return GridMath.chebyshev(a, b)
+## True if `to_pos` is within `attack_range` under this ability's `range_metric`.
+func is_in_attack_range(from_pos: Vector2i, to_pos: Vector2i) -> bool:
+	return GridMath.is_within_range(from_pos, to_pos, float(attack_range), range_metric)
 
 
 func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
@@ -28,7 +32,7 @@ func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
 	if unit == null or ctx == null or ctx.battle_state == null:
 		return result
 	for enemy in _opposing_living(unit, ctx):
-		if tile_distance(unit.grid_pos, enemy.grid_pos) <= attack_range:
+		if is_in_attack_range(unit.grid_pos, enemy.grid_pos):
 			result.append(enemy.grid_pos)
 	return result
 
@@ -41,7 +45,7 @@ func is_valid_target(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> b
 		return false
 	if occupant.team == unit.team:
 		return false
-	return tile_distance(unit.grid_pos, occupant.grid_pos) <= attack_range
+	return is_in_attack_range(unit.grid_pos, occupant.grid_pos)
 
 
 func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> Dictionary:
@@ -69,6 +73,7 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 		"presentation": BattleEnums.Presentation.ATTACK,
 		"distance_penalty_per_tile": distance_penalty_per_tile,
 		"attack_range": attack_range,
+		"range_metric": range_metric,
 	}
 
 

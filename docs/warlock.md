@@ -29,7 +29,7 @@ The Warlock fights from mid range with a finite mana pool. Before a real strike,
 | ------------------ | -------------------------------------------------------------- |
 | High reach         | Mid-range glass cannon — can threaten before melee closes      |
 | Scalable burst     | Committed mana turns one action into a fight-swinging hit      |
-| Panic shield       | Mana Shield eats one hit — or Overload soak for up to **3 unit turns** / until own turn |
+| Panic shield       | Mana Shield blocks hits from bank (`1` per `mana_cost`) — or Overload soak for up to **3 unit turns** / until own turn |
 | Always has a basic | Dry → **Fist Fight** — still acts, in the saddest way possible |
 | Deep pool          | ~100 mana supports several meaningful charges if rationed      |
 
@@ -235,6 +235,7 @@ Authoritative Overload effects still live in design/impl notes; player text only
 | -------------------- | ------------------------------------------------------------------------------------------------------- |
 | Category / cost slot | `ACTION` / `ACTION`                                                                                     |
 | `attack_range`       | **4** (tune 4–5)                                                                                        |
+| `range_metric`       | **EUCLIDEAN** — √(dx²+dy²); corner tiles need more reach than Chebyshev                                 |
 | Drawn-mana cost      | Requires `drawn_mana >= mana_cost`; **spends the whole bank** (`drawn_mana → 0`)            |
 | `mana_cost`          | Proposed **5** (one Draw minimum to fire)                                                   |
 | `overload_threshold` | Proposed **15** (must be **&lt; max_drawn_mana** so Overload is reachable under the 20 cap) |
@@ -271,16 +272,17 @@ Self buff. Spends the Draw bank to raise an occult barrier. Contrast Warrior sta
 
 ```
 active: bool
-charges: int              # normal: 1; Overload: unused (duration mode instead)
+charges: int              # normal: floor(spent / mana_cost); Overload: unused (duration mode instead)
 remaining_unit_turns: int # Overload: countdown (default **3**)
 ```
 
 #### Normal (spent ≤ threshold)
 
-- Raise shield with **`charges = 1`**.
+- Raise shield with **`charges = floor(spent / mana_cost)`** (min 1) — e.g. bank 5 → 1 block, 10 → 2, 15 → 3.
 - On a hit that would apply damage (`on_incoming_damage`): set `final_damage = 0`, then `charges -= 1` → shield down when charges hit 0.
-- **Blocks one attack no matter the damage.** Excess does **not** carry over to HP (there is no excess — the whole hit is negated).
+- **Each charge fully blocks one attack no matter the damage.** Excess does **not** carry over to HP.
 - Misses never touch this path (same as Warrior shield).
+- Also clears on Warlock’s own turn start if any charges remain.
 
 #### Overload (spent > threshold) — discovery-gated like other Overloads
 
@@ -293,7 +295,7 @@ remaining_unit_turns: int # Overload: countdown (default **3**)
 
 **Impl note:** `Unit.modify_incoming_damage` currently dispatches **PASSIVE** abilities. Mana Shield needs those hooks while raised — either allow this ACTION ability’s hooks when `active`, or pair with a thin PASSIVE that reads this ability’s state. Prefer one resource that owns raise + block state. Duration needs both a global “other unit turn start” tick and the Warlock’s `on_turn_started` clear.
 
-**Player-facing (before Overload unlock):** describe only the one-hit full block. Overload “lasts up to 3 unit turns, or until your next turn” unlocks when Draw bank hits this ability’s threshold.
+**Player-facing (before Overload unlock):** describe charge scaling (`1` block per `mana_cost` banked). Overload “lasts up to 3 unit turns, or until your next turn” unlocks when Draw bank hits this ability’s threshold.
 
 ### Fist Fight — `warlock_fist_fight`
 
@@ -302,6 +304,7 @@ remaining_unit_turns: int # Overload: countdown (default **3**)
 | -------------------- | ------------------------------------------------------------------------------------------------------- |
 | Category / cost slot | `ACTION` / `ACTION`                                                                                     |
 | `attack_range`       | **1** (adjacent only, Chebyshev — diagonals count)                                                      |
+| `range_metric`       | **CHEBYSHEV**                                                                                           |
 | Mana / Draw bank     | **None** — never touches well or Draw bank                                                              |
 | Hit chance           | **50% to miss** (flat) — intentional exception to the usual 100% base accuracy                          |
 | Damage               | Unit `damage` (default **8**) — a sad little punch                                                      |
@@ -316,7 +319,7 @@ The dry-out “basic.” Not a spell. The Warlock has run out of occult dignity 
 
 ## Combat positioning
 
-- Range uses **Chebyshev** (project grid rule).
+- Fist Fight range uses **Chebyshev** (`range_metric = CHEBYSHEV`). Charged Bolt uses **Euclidean** — see `grid.mdc` / abilities **Attack range metric**.
 - Wants mid-distance sight lines and cover; dies quickly if Warriors/Scouts close.
 - Half/full cover reduce hit chance as usual; no Warrior-style “cannot melee full cover” rule unless we add one later.
 - Draw does not move or deal damage — pure free economy; action stays available for the bolt.
@@ -424,7 +427,7 @@ Possible later abilities that still fit: other Draw variants, emergency self-hur
 - [x] Overload when spent drawn mana > that cast’s `overload_threshold` (per-ability resolve path)
 - [x] Draw bank capped at `max_drawn_mana` (**20**)
 - [x] Overload effects differ by skill; tooltip locked until `drawn_mana >=` that ability’s `overload_threshold`, then unlocks
-- [x] Mana Shield: dumps Draw bank; blocks one hit fully (no HP carryover)
+- [x] Mana Shield: dumps Draw bank; blocks `floor(spent / mana_cost)` hits fully (no HP carryover)
 - [x] Mana Shield Overload: up to **3 unit turns** or Warlock’s own turn start (whichever first); full-blocks each hit while up
 - [x] Fist Fight: free ACTION, range 1, ~50% miss, works when dry
 - [x] Overhead HUD shows HP + well mana; Draw bank readable; Overload text gated by unlock

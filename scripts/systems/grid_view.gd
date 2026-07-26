@@ -20,8 +20,10 @@ const HALF_COVER_COLOR := Color(0.75, 0.6, 0.25)
 const FULL_COVER_COLOR := Color(0.35, 0.7, 0.4)
 const REACHABLE_COLOR := Color(0.3, 0.55, 0.95, 0.55)
 const ATTACKABLE_COLOR := Color(0.95, 0.35, 0.3, 0.55)
+const RANGE_COLOR := Color(0.95, 0.75, 0.3, 0.28)
 const PATH_COLOR := Color(0.35, 0.95, 0.95, 0.7)
 const HOVER_COLOR := Color(1.0, 1.0, 0.4, 0.65)
+const SELF_TARGET_COLOR := Color(0.55, 0.85, 1.0, 0.5)
 
 
 func _ready() -> void:
@@ -94,6 +96,14 @@ func show_reachable(tiles: Array[Vector2i]) -> void:
 
 func show_attackable(tiles: Array[Vector2i]) -> void:
 	_show_colored(tiles, ATTACKABLE_COLOR)
+
+
+func show_range(tiles: Array[Vector2i]) -> void:
+	_show_colored(tiles, RANGE_COLOR)
+
+
+func show_self_target(tiles: Array[Vector2i]) -> void:
+	_show_colored(tiles, SELF_TARGET_COLOR)
 
 
 func show_path(tiles: Array[Vector2i]) -> void:

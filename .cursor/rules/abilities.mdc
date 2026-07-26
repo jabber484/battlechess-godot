@@ -10,7 +10,7 @@ alwaysApply: false
 
 - Abilities are `AbilityData` Resources under `scripts/abilities/`. They define **behavior and rules**, not combat stats.
 - Units own an `Array[AbilityData]`. Attach via `UnitStats.abilities`; `Unit.setup` **duplicates** ability resources per instance.
-- Core combat stats (`move_range`, `accuracy`, `damage`, HP, move/action budgets, …) live on **`Unit` / `UnitStats`**. Attack **range** and **distance falloff** live on the attack ability; abilities still read damage/accuracy from the unit.
+- Core combat stats (`move_range`, `accuracy`, `damage`, HP, move/action budgets, …) live on **`Unit` / `UnitStats`**. Attack **range** (`attack_range` + `range_metric`) and **distance falloff** live on the attack ability; abilities still read damage/accuracy from the unit.
 - Prefer the name **ability** (not skill) in code, paths, and docs.
 
 ## Required AbilityData API
@@ -29,33 +29,78 @@ alwaysApply: false
 - AI still resolves by `category` + `can_activate` + `is_valid_target` (`Unit.resolve_ability`); first matching ability wins.
 - Presentation (camera/tweens/move log) is owned by `BattlePresenter`; `BattleController` orchestrates; `ActionRunner` remains the execution pipeline.
 - Hit/damage math stays in `CombatSystem`; attack presentation calls into it (same role pathfinding plays for move).
-- Attack `attack_range` and `distance_penalty_per_tile` live on attack abilities (e.g. `SimpleAttackAbilityData`), passed into `CombatSystem`. Cover penalties stay global on `CombatSystem`.
-- Warrior basic attack: `attack_range = 1` (adjacent including diagonal).
-- Grid defaults (Chebyshev range, octile move cost): see `grid.mdc`.
+- Cover penalties stay global on `CombatSystem`.
+- Grid defaults (melee Chebyshev / ranged Euclidean / octile move): see `grid.mdc`.
+
+## Attack range metric
+
+Attack reach is **not** hard-coded to Chebyshev. Each attack ability sets `range_metric` (`BattleEnums.RangeMetric`) alongside `attack_range`.
+
+| Value | Distance | When to use |
+|-------|----------|-------------|
+| `CHEBYSHEV` | `max(\|dx\|, \|dy\|)` | Melee / touch — diagonals count as 1 |
+| `EUCLIDEAN` | `√(dx² + dy²)` | Ranged — geometric circle; corner tiles cost more reach |
+
+### Why this choice
+
+- **CHEBYSHEV (melee):** Adjacency is about “can I strike any neighboring tile,” including diagonals. A square ring matches that fantasy — diagonal foes are still in melee reach 1, same as cardinal. Using Euclidean here would make diagonal neighbors `√2` and drop them out of range 1.
+- **EUCLIDEAN / Pythagorean (ranged):** Shots care about real distance on the board. Chebyshev treats `(5,0)` and `(5,5)` as the same range; Euclidean does not — corner tiles are farther (`√(5²+5²) ≈ 7.1`), so the reach ring is a circle, not a square. Falloff follows the same metric so hit chance tracks geometric distance.
+
+Movement path cost is separate (octile √2 steps) — see `grid.mdc`. Do not confuse path budget with attack `range_metric`.
+
+**Defaults & current kit**
+
+- `SimpleAttackAbilityData` / Charged Bolt → `EUCLIDEAN`
+- Warrior Melee / Reckless / Fist Fight → set `range_metric = CHEBYSHEV` in `_init`
+
+**How to use (ability code)**
+
+1. Set `attack_range` and `range_metric` on the ability (Inspector or `_init`).
+2. Prefer `is_in_attack_range(from, to)` for targeting — do **not** call `GridMath.chebyshev` directly for attack reach.
+3. Put `"range_metric": range_metric` (and `"attack_range"`) in `build_execution` so `BattlePresenter` / `CombatSystem` use the same metric for commit + falloff.
+4. Distance falloff uses the same metric: `round(max(0, dist − 1) × distance_penalty_per_tile)`.
+
+```gdscript
+# Melee subclass
+func _init() -> void:
+	attack_range = 1
+	range_metric = BattleEnums.RangeMetric.CHEBYSHEV
+
+# Targeting
+if is_in_attack_range(unit.grid_pos, enemy.grid_pos):
+	...
+```
+
+**How to use (systems)**
+
+- Range check: `GridMath.is_within_range(a, b, float(max_range), metric)`
+- Raw distance: `GridMath.range_distance(a, b, metric)`
+- Pass `range_metric` into `CombatSystem.explain_hit_chance` / `compute_hit_chance` / `commit_attack`
+- UI ring highlight: call the ability’s `is_in_attack_range` (see `BattleController._attack_range_tiles`)
 
 
 ## Adding a new ability
 
 1. Subclass `AbilityData` (e.g. `SimpleMoveAbilityData`, `SimpleAttackAbilityData`, `LeapAbilityData`), unique `id`, set `category` / `cost_slot`.
-2. Override the four methods; read damage/accuracy from `unit`; set attack `attack_range` / falloff on the ability.
+2. Override the four methods; read damage/accuracy from `unit`; for attacks set `attack_range`, `range_metric`, and falloff (see **Attack range metric** above).
 3. Put an instance on the unit’s `abilities` array (via `UnitStats` / spawn setup).
 4. Do not add parallel execute paths in the controller when category resolve already covers it.
 
 Standard abilities:
 
 - Walk: `SimpleMoveAbilityData` (`id = &"simple_move"`)
-- Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`)
-- Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost, extends simple attack; cannot target directional full cover
-- Warrior reckless: `WarriorRecklessAttackAbilityData` (`id = &"warrior_reckless_attack"`) — free action (`CostSlot.NONE`), stamina cost, once per turn; enemy retaliates first then Warrior hits
+- Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`) — `range_metric = EUCLIDEAN`
+- Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost; `CHEBYSHEV` range 1; cannot target directional full cover
+- Warrior reckless: `WarriorRecklessAttackAbilityData` (`id = &"warrior_reckless_attack"`) — free action (`CostSlot.NONE`), stamina cost, once per turn; enemy retaliates first then Warrior hits (`CHEBYSHEV`)
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
 - Warlock Draw: `WarlockDrawManaAbilityData` (`id = &"warlock_draw_mana"`) — free action (`NONE`); well → Draw bank (`drawn_mana`, cap 20)
-- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — dumps Draw bank; damage scales with spent; Overload = 150% damage
-- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — dumps Draw bank; full-blocks hits while raised; Overload = up to 3 unit turns
-- Warlock Fist Fight: `WarlockFistFightAbilityData` (`id = &"warlock_fist_fight"`) — dry melee, flat 50% hit chance
+- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — dumps Draw bank; `EUCLIDEAN` range; damage scales with spent; Overload = 150% damage
+- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — dumps Draw bank; normal charges = `floor(spent / mana_cost)` full blocks; Overload = up to 3 unit turns
+- Warlock Fist Fight: `WarlockFistFightAbilityData` (`id = &"warlock_fist_fight"`) — dry melee, `CHEBYSHEV` range 1, flat 50% hit chance
 - Draw bank resolution: `WarlockDrawBank.get_provider(unit)` — casts never hard-code a bank ability id forever
 - `CostSlot.NONE`: free abilities (no move/action budget); `can_activate` still requires owning the turn
-- `CombatSystem.commit_attack(..., require_action, require_own_turn, damage_override, hit_chance_override)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation; overrides for ability-scaled damage / flat miss
+- `CombatSystem.commit_attack(..., require_action, require_own_turn, damage_override, hit_chance_override, range_metric)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation; overrides for ability-scaled damage / flat miss; always pass the ability’s `range_metric`
 - `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities (passives and per-turn ACTION state)
 - Turn auto-end (`TurnManager._try_auto_finish`) stays open while **any** non-passive ability `can_activate` (wired via `keep_turn_open_check`)
 

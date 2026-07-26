@@ -39,6 +39,31 @@ static func chebyshev(a: Vector2i, b: Vector2i) -> int:
 	return maxi(absi(a.x - b.x), absi(a.y - b.y))
 
 
+## Straight-line grid distance √(dx² + dy²). Used for ranged attack reach.
+static func euclidean(a: Vector2i, b: Vector2i) -> float:
+	var dx := float(a.x - b.x)
+	var dy := float(a.y - b.y)
+	return sqrt(dx * dx + dy * dy)
+
+
+static func range_distance(a: Vector2i, b: Vector2i, metric: BattleEnums.RangeMetric) -> float:
+	match metric:
+		BattleEnums.RangeMetric.EUCLIDEAN:
+			return euclidean(a, b)
+		_:
+			return float(chebyshev(a, b))
+
+
+## Attack reach check. Prefer `SimpleAttackAbilityData.is_in_attack_range` from ability code.
+static func is_within_range(
+	a: Vector2i,
+	b: Vector2i,
+	max_range: float,
+	metric: BattleEnums.RangeMetric,
+) -> bool:
+	return range_distance(a, b, metric) <= max_range + COST_EPSILON
+
+
 ## Octile / Pythagorean path length on an open grid (min cost with 8-dir steps).
 static func octile(a: Vector2i, b: Vector2i) -> float:
 	var dx := absi(a.x - b.x)

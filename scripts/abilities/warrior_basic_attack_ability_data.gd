@@ -10,6 +10,7 @@ func _init() -> void:
 	category = BattleEnums.AbilityCategory.ACTION
 	cost_slot = BattleEnums.CostSlot.ACTION
 	attack_range = 1
+	range_metric = BattleEnums.RangeMetric.CHEBYSHEV
 
 
 func can_activate(unit: Unit, ctx: AbilityContext) -> bool:

@@ -1,19 +1,39 @@
 ---
-description: Grid distance — Chebyshev for range, octile cost for movement
+description: Grid distance — Chebyshev melee range, Euclidean ranged, octile movement
 globs: scripts/util/grid_math.gd,scripts/systems/pathfinding_system.gd,scripts/systems/combat_system.gd,scripts/systems/ai_system.gd,scripts/abilities/**/*.gd
 alwaysApply: true
 ---
 
 # Grid distance & pathfinding
 
-## Attack range & adjacency — **Chebyshev**
+## Attack range — `range_metric`
 
-Discrete tile rings use **Chebyshev** (8-directional — diagonals count as 1 tile), unless a feature explicitly opts out.
+Reach is chosen per attack ability via `SimpleAttackAbilityData.range_metric` (`BattleEnums.RangeMetric`). Full authoring guide: **Attack range metric** in `abilities.mdc`.
 
-- Distance: `GridMath.chebyshev(a, b)` — `max(|dx|, |dy|)`
-- Neighbors: `GridMath.chebyshev_neighbors(pos)`
-- Attack range, adjacency, and distance falloff all use this
-- Opt-out only when specified (e.g. orthogonal-only ability): `GridMath.manhattan` / `GridMath.orthogonal_neighbors`, documented on that ability
+| Metric | Formula | Used for |
+|--------|---------|----------|
+| **CHEBYSHEV** | `max(\|dx\|, \|dy\|)` | Melee — diagonals count as 1 |
+| **EUCLIDEAN** | `√(dx² + dy²)` | Ranged — geometric circle |
+
+**Why:** Melee needs all 8 adjacent tiles at range 1 (Chebyshev). Ranged should pay for true distance so diagonal corners are farther than cardinals (Euclidean / Pythagorean). Details in `abilities.mdc` → **Why this choice**.
+
+### API
+
+| Call | Role |
+|------|------|
+| `ability.is_in_attack_range(from, to)` | Preferred for ability targeting / UI rings |
+| `GridMath.is_within_range(a, b, max_range, metric)` | Systems that already hold a metric + range |
+| `GridMath.range_distance(a, b, metric)` | Raw distance (hit falloff, AI scoring) |
+| `GridMath.euclidean(a, b)` | Euclidean only |
+| `GridMath.chebyshev(a, b)` | Chebyshev only — do **not** use for ranged reach |
+
+Default on `SimpleAttackAbilityData` is **EUCLIDEAN**. Melee subclasses set **CHEBYSHEV** in `_init`.
+
+Distance falloff uses the same metric: `round(max(0, dist − 1) × distance_penalty_per_tile)`.
+
+Pass `range_metric` through execution → `CombatSystem.commit_attack` / `explain_hit_chance`. Do not assume Chebyshev in presenter, AI, or highlights.
+
+Orthogonal-only opt-out: `GridMath.manhattan` / `orthogonal_neighbors`, documented on that ability.
 
 ## Movement — **octile / Pythagorean cost**
 

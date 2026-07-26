@@ -18,6 +18,9 @@ enum CostSlot { MOVE, ACTION, NONE }
 
 enum UnitResource { NONE, STAMINA, MANA, ENERGY }
 
+## Attack reach rings: melee stays Chebyshev; ranged uses Euclidean (√(dx²+dy²)).
+enum RangeMetric { CHEBYSHEV, EUCLIDEAN }
+
 enum Presentation { NONE, MOVE, ATTACK, RECKLESS_ATTACK, DRAW, SELF_BUFF }
 
 const DIRECTION_VECTORS: Array[Vector2i] = [
