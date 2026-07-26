@@ -12,15 +12,16 @@ func _ready() -> void:
 	grid_system = get_node(grid_system_path) as GridSystem
 
 
-func get_reachable_tiles(unit: Unit) -> Array[Vector2i]:
+## Reachable tiles within `budget` octile path cost. Pass `budget < 0` to use `unit.movement_remaining`.
+func get_reachable_tiles(unit: Unit, budget: float = -1.0) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	if unit == null or unit.is_dead():
 		return result
-	var budget := unit.movement_remaining
-	var costs := _dijkstra_costs(unit.grid_pos, unit, budget)
+	var move_budget := unit.movement_remaining if budget < 0.0 else budget
+	var costs := _dijkstra_costs(unit.grid_pos, unit, move_budget)
 	for pos in costs:
 		var cost: float = costs[pos]
-		if cost > GridMathScript.COST_EPSILON and GridMathScript.cost_within_budget(cost, budget):
+		if cost > GridMathScript.COST_EPSILON and GridMathScript.cost_within_budget(cost, move_budget):
 			result.append(pos)
 	return result
 
@@ -77,8 +78,8 @@ func find_path(from_pos: Vector2i, to_pos: Vector2i, mover: Unit = null) -> Arra
 	return path
 
 
-func is_reachable(unit: Unit, target: Vector2i) -> bool:
-	return get_reachable_tiles(unit).has(target)
+func is_reachable(unit: Unit, target: Vector2i, budget: float = -1.0) -> bool:
+	return get_reachable_tiles(unit, budget).has(target)
 
 
 func _dijkstra_costs(start: Vector2i, mover: Unit, budget: float) -> Dictionary:

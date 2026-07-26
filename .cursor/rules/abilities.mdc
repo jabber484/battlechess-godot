@@ -51,7 +51,7 @@ Movement path cost is separate (octile √2 steps) — see `grid.mdc`. Do not co
 **Defaults & current kit**
 
 - `SimpleAttackAbilityData` / Charged Bolt → `EUCLIDEAN`
-- Warrior Melee / Reckless / Fist Fight → set `range_metric = CHEBYSHEV` in `_init`
+- Warrior Melee / Brawl / Fist Fight → set `range_metric = CHEBYSHEV` in `_init`
 
 **How to use (ability code)**
 
@@ -89,9 +89,10 @@ if is_in_attack_range(unit.grid_pos, enemy.grid_pos):
 Standard abilities:
 
 - Walk: `SimpleMoveAbilityData` (`id = &"simple_move"`) — spends remaining movement by path cost; can activate again until range is exhausted
+- Warrior Move: `WarriorMoveAbilityData` (`id = &"warrior_move"`) — replaces Walk on Warrior; same MOVE slot, plus up to `extra_range` (default 2) octile overspend at `stamina_per_tile` (default 5) per started overflow unit; extension capped per turn
 - Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`) — `range_metric = EUCLIDEAN`
 - Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost; `CHEBYSHEV` range 1; cannot target directional full cover
-- Warrior reckless: `WarriorRecklessAttackAbilityData` (`id = &"warrior_reckless_attack"`) — free action (`CostSlot.NONE`), stamina cost, once per turn; enemy retaliates first then Warrior hits (`CHEBYSHEV`)
+- Warrior Brawl: `WarriorBrawlAbilityData` (`id = &"warrior_brawl"`) — free action (`CostSlot.NONE`), stamina cost, once per turn; enemy retaliates first then Warrior hits (`CHEBYSHEV`)
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
 - Warlock Draw: `WarlockDrawManaAbilityData` (`id = &"warlock_draw_mana"`) — free action (`NONE`); well → Draw bank (`drawn_mana`, cap 20)
@@ -101,7 +102,7 @@ Standard abilities:
 - Warlock Fist Fight: `WarlockFistFightAbilityData` (`id = &"warlock_fist_fight"`) — dry melee, `CHEBYSHEV` range 1, flat 50% hit chance
 - Draw bank resolution: `WarlockDrawBank.get_provider(unit)` — casts never hard-code a bank ability id forever
 - `CostSlot.NONE`: free abilities (no movement/action budget); `can_activate` still requires owning the turn
-- `CostSlot.MOVE`: gated by `unit.can_move_more()` (remaining movement ≥ one cardinal step); complete via `notify_moved(unit, path_cost)`
+- `CostSlot.MOVE`: gated by `unit.can_move_more()` (remaining movement ≥ one cardinal step); complete via `notify_moved(unit, path_cost)`. Warrior Move may also activate on stamina extension when free move is exhausted
 - `CombatSystem.commit_attack(..., require_action, require_own_turn, damage_override, hit_chance_override, range_metric)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation; overrides for ability-scaled damage / flat miss; always pass the ability’s `range_metric`
 - `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities (passives and per-turn ACTION state)
 - Turn auto-end (`TurnManager._try_auto_finish`) stays open while **any** non-passive ability `can_activate` (wired via `keep_turn_open_check`)

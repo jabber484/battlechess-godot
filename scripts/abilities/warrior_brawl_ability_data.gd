@@ -1,7 +1,7 @@
-class_name WarriorRecklessAttackAbilityData
+class_name WarriorBrawlAbilityData
 extends WarriorBasicAttackAbilityData
 
-## Reckless — once-per-turn free-action melee: enemy strikes first, then Warrior hits.
+## Brawl — once-per-turn free-action melee: enemy strikes first, then Warrior hits.
 ##
 ## Slot: ACTION / CostSlot.NONE (does not spend the action budget).
 ## Target: same as Melee (adjacent, not directional full cover).
@@ -13,8 +13,8 @@ var used_this_turn: bool = false
 
 
 func _init() -> void:
-	id = &"warrior_reckless_attack"
-	display_name = "Reckless"
+	id = &"warrior_brawl"
+	display_name = "Brawl"
 	category = BattleEnums.AbilityCategory.ACTION
 	cost_slot = BattleEnums.CostSlot.NONE
 	attack_range = 1
@@ -72,7 +72,7 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 		"complete": Callable(),
 		"death_units": [unit, defender],
 		"defender": defender,
-		"presentation": BattleEnums.Presentation.RECKLESS_ATTACK,
+		"presentation": BattleEnums.Presentation.BRAWL,
 		"distance_penalty_per_tile": warrior_falloff,
 		"attack_range": warrior_range,
 		"range_metric": range_metric,

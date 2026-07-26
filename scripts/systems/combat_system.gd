@@ -125,7 +125,7 @@ func cover_penalty_between(attacker_pos: Vector2i, defender_pos: Vector2i) -> in
 
 ## Turn gates for commit_attack:
 ## - require_action: attacker must own the turn and have an ACTION remaining (normal attacks)
-## - require_own_turn: attacker must own the turn (free-action attacks like Reckless)
+## - require_own_turn: attacker must own the turn (free-action attacks like Brawl)
 ## - interrupt: no turn/action budget checks (retaliation mid-exchange)
 func commit_attack(
 	attacker: Unit,

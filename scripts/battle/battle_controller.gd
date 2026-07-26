@@ -474,7 +474,24 @@ func _refresh_highlights() -> void:
 		BattleEnums.AbilityCategory.MOVE:
 			battle_ui.set_hit_chance("")
 			var move_tiles := ability.get_target_tiles(active, _ability_ctx)
-			if not move_tiles.is_empty():
+			if ability is WarriorMoveAbilityData:
+				var warrior_move := ability as WarriorMoveAbilityData
+				var stamina_tiles: Array[Vector2i] = warrior_move.get_stamina_overspend_tiles(
+					active, _ability_ctx
+				)
+				var stamina_set: Dictionary = {}
+				for pos in stamina_tiles:
+					stamina_set[pos] = true
+				var free_tiles: Array[Vector2i] = []
+				for pos in move_tiles:
+					if stamina_set.has(pos):
+						continue
+					free_tiles.append(pos)
+				if not free_tiles.is_empty():
+					grid_view.show_reachable(free_tiles)
+				if not stamina_tiles.is_empty():
+					grid_view.show_stamina_reachable(stamina_tiles)
+			elif not move_tiles.is_empty():
 				grid_view.show_reachable(move_tiles)
 			if ability == _selected_ability:
 				_refresh_move_hover_preview(active)

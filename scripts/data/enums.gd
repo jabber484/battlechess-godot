@@ -21,7 +21,8 @@ enum UnitResource { NONE, STAMINA, MANA, ENERGY }
 ## Attack reach rings: melee stays Chebyshev; ranged uses Euclidean (√(dx²+dy²)).
 enum RangeMetric { CHEBYSHEV, EUCLIDEAN }
 
-enum Presentation { NONE, MOVE, ATTACK, RECKLESS_ATTACK, DRAW, SELF_BUFF }
+## Presentation kinds for BattlePresenter (MOVE, ATTACK, Brawl, etc.).
+enum Presentation { NONE, MOVE, ATTACK, BRAWL, DRAW, SELF_BUFF }
 
 const DIRECTION_VECTORS: Array[Vector2i] = [
 	Vector2i(0, -1), # NORTH

@@ -57,8 +57,8 @@ func enhance_execution(
 			_enhance_move(unit, target_pos, execution)
 		BattleEnums.Presentation.ATTACK:
 			_enhance_attack(unit, execution)
-		BattleEnums.Presentation.RECKLESS_ATTACK:
-			_enhance_reckless_attack(unit, execution)
+		BattleEnums.Presentation.BRAWL:
+			_enhance_brawl(unit, execution)
 		BattleEnums.Presentation.DRAW:
 			_enhance_draw(unit, execution)
 		BattleEnums.Presentation.SELF_BUFF:
@@ -148,7 +148,7 @@ func _enhance_attack(unit: Unit, execution: Dictionary) -> void:
 		focus_grid_pos(unit.grid_pos)
 
 
-func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
+func _enhance_brawl(unit: Unit, execution: Dictionary) -> void:
 	var defender = execution.get("defender", null)
 	if not defender is Unit:
 		return
@@ -222,7 +222,7 @@ func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
 			if prior_complete.is_valid():
 				prior_complete.call()
 			_battle_ui.append_log(
-				"%s recklessly attacks %s (enemy strikes first)" % [
+				"%s brawls %s (enemy strikes first)" % [
 					unit.display_name,
 					target.display_name,
 				],

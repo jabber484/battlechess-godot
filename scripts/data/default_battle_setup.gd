@@ -5,8 +5,9 @@ const UnitSpawnData := preload("res://scripts/data/unit_spawn.gd")
 const UnitStatsData := preload("res://scripts/data/unit_stats.gd")
 const SimpleMoveAbilityDataScript := preload("res://scripts/abilities/simple_move_ability_data.gd")
 const SimpleAttackAbilityDataScript := preload("res://scripts/abilities/simple_attack_ability_data.gd")
+const WarriorMoveAbilityDataScript := preload("res://scripts/abilities/warrior_move_ability_data.gd")
 const WarriorBasicAttackAbilityDataScript := preload("res://scripts/abilities/warrior_basic_attack_ability_data.gd")
-const WarriorRecklessAttackAbilityDataScript := preload("res://scripts/abilities/warrior_reckless_attack_ability_data.gd")
+const WarriorBrawlAbilityDataScript := preload("res://scripts/abilities/warrior_brawl_ability_data.gd")
 const WarriorStaminaShieldAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_shield_ability_data.gd")
 const WarriorStaminaRechargeAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_recharge_ability_data.gd")
 const WarlockDrawManaAbilityDataScript := preload("res://scripts/abilities/warlock_draw_mana_ability_data.gd")
@@ -79,9 +80,9 @@ static func _make_warrior_stats() -> UnitStatsData:
 	stats.resource_id = BattleEnums.UnitResource.STAMINA
 	stats.max_resource = 50
 	var abilities: Array[AbilityData] = []
-	abilities.append(SimpleMoveAbilityDataScript.new())
+	abilities.append(WarriorMoveAbilityDataScript.new())
 	abilities.append(WarriorBasicAttackAbilityDataScript.new())
-	abilities.append(WarriorRecklessAttackAbilityDataScript.new())
+	abilities.append(WarriorBrawlAbilityDataScript.new())
 	abilities.append(WarriorStaminaShieldAbilityDataScript.new())
 	abilities.append(WarriorStaminaRechargeAbilityDataScript.new())
 	stats.abilities = abilities

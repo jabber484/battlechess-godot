@@ -250,7 +250,7 @@ func notify_turn_started() -> void:
 	for ability in abilities:
 		if ability == null:
 			continue
-		# Passives (recharge, etc.) and ACTION kits with per-turn state (e.g. Reckless).
+		# Passives (recharge, etc.) and ACTION kits with per-turn state (e.g. Brawl).
 		ability.on_turn_started(self)
 
 
