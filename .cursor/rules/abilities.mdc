@@ -96,7 +96,8 @@ Standard abilities:
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
 - Warlock Draw: `WarlockDrawManaAbilityData` (`id = &"warlock_draw_mana"`) — free action (`NONE`); well → Draw bank (`drawn_mana`, cap 20)
 - Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — dumps Draw bank; `EUCLIDEAN` range; damage scales with spent; Overload = 150% damage
-- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — dumps Draw bank; normal charges = `floor(spent / mana_cost)` full blocks; Overload = up to 3 unit turns
+- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — free action (`NONE`); dumps Draw bank; normal charges = `floor(spent / mana_cost)` full blocks; Overload = up to 3 unit turns
+- Warlock Meditate: `WarlockMeditateAbilityData` (`id = &"warlock_meditate"`) — ACTION; restore half max mana, then immediately end the turn
 - Warlock Fist Fight: `WarlockFistFightAbilityData` (`id = &"warlock_fist_fight"`) — dry melee, `CHEBYSHEV` range 1, flat 50% hit chance
 - Draw bank resolution: `WarlockDrawBank.get_provider(unit)` — casts never hard-code a bank ability id forever
 - `CostSlot.NONE`: free abilities (no move/action budget); `can_activate` still requires owning the turn

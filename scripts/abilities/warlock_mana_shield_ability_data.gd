@@ -3,7 +3,7 @@ extends AbilityData
 
 ## Mana Shield — raise a full-block barrier by dumping the Draw bank.
 ##
-## Slot: ACTION / CostSlot.ACTION; self-cast, runs on ability-bar click (`activates_on_select`).
+## Slot: ACTION / CostSlot.NONE (free — does not spend move or action); self-cast (`activates_on_select`).
 ## Cost: requires Draw bank ≥ `mana_cost`, then spends the **whole** bank.
 ## Normal (spent ≤ `overload_threshold`): blocks **1** damaging hit fully (no HP carryover).
 ## Overload (spent > threshold): blocks every damaging hit while up.
@@ -29,7 +29,7 @@ func _init() -> void:
 	id = &"warlock_mana_shield"
 	display_name = "Mana Shield"
 	category = BattleEnums.AbilityCategory.ACTION
-	cost_slot = BattleEnums.CostSlot.ACTION
+	cost_slot = BattleEnums.CostSlot.NONE
 
 
 func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
@@ -112,7 +112,6 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 	if provider == null:
 		return empty
 
-	var turn_manager := ctx.turn_manager
 	var spent_holder := {"spent": 0, "overload": false}
 
 	return {
@@ -126,9 +125,7 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 			_raise_shield(unit, bool(spent_holder["overload"]))
 			return true,
 		"present": Callable(),
-		"complete": func() -> void:
-			if turn_manager:
-				turn_manager.notify_acted(unit),
+		"complete": Callable(),
 		"death_units": [],
 		"presentation": BattleEnums.Presentation.SELF_BUFF,
 		"spent_drawn": spent_holder,

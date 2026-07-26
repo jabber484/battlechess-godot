@@ -251,21 +251,21 @@ func _enhance_self_buff(unit: Unit, execution: Dictionary) -> void:
 	execution["present"] = func() -> void:
 		focus_grid_pos(unit.grid_pos)
 		await _host.get_tree().create_timer(0.45).timeout
+	# Mana Shield sets spent_drawn; other SELF_BUFF abilities (e.g. Meditate) log themselves.
+	var spent_holder: Variant = execution.get("spent_drawn", null)
+	if typeof(spent_holder) != TYPE_DICTIONARY:
+		return
 	if _battle_ui:
 		var prior_complete: Callable = execution.get("complete", Callable())
-		var spent_holder: Variant = execution.get("spent_drawn", {})
 		execution["complete"] = func() -> void:
 			if prior_complete.is_valid():
 				prior_complete.call()
-			var spent := 0
-			var overload := false
-			if typeof(spent_holder) == TYPE_DICTIONARY:
-				spent = int(spent_holder.get("spent", 0))
-				overload = bool(spent_holder.get("overload", false))
+			var spent := int(spent_holder.get("spent", 0))
+			var overload := bool(spent_holder.get("overload", false))
 			var mode := "Overload" if overload else "raised"
 			var detail := "up to 3 unit turns / until own turn"
 			if not overload:
-				var block_charges: int = int(spent_holder.get("charges", 0)) if typeof(spent_holder) == TYPE_DICTIONARY else 0
+				var block_charges: int = int(spent_holder.get("charges", 0))
 				if block_charges <= 0:
 					block_charges = maxi(1, int(spent / 5))
 				detail = "blocks %d hit%s" % [block_charges, "" if block_charges == 1 else "s"]

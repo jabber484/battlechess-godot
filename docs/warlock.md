@@ -2,7 +2,7 @@
 
 Status: **implemented (prototype)**  
 Last updated: 2026-07-26  
-Role: mid-range glass cannon whose **mana** is a deep, non-regenerating well — power comes from **drawing** into the Draw skill’s bank before you fire.
+Role: mid-range glass cannon whose **mana** is a finite well — power comes from **drawing** into the Draw skill’s bank before you fire. **Meditate** can buy back half the well at the cost of the whole turn.
 
 Contrast: [Warrior](warrior.md) regenerates stamina every turn and shares it between attack and soak. Warlock never refills mana passively; empty is a lasting problem for that battle.
 
@@ -15,11 +15,12 @@ The Warlock fights from mid range with a finite mana pool. Before a real strike,
 
 | Pillar            | Intent                                                                                     |
 | ----------------- | ------------------------------------------------------------------------------------------ |
-| Finite well       | Deep mana, **no** turn-start / passive regen                                               |
+| Finite well       | Mana pool (default **50**), **no** turn-start / passive regen                              |
 | Draw → bank       | Well → **Draw skill state** only; never drawn straight into a cast                         |
 | Casts cost bank   | **Most spells dump the whole Draw bank** into the cast (not a partial sip)                 |
 | Overload          | Past a per-ability threshold, each spell changes in its **own** way — effect unlocks when bank hits that threshold |
-| Dry is punishment | Empty well / empty bank → only **Fist Fight**; the joke is on you                          |
+| Turn-tax refill   | **Meditate** restores half max mana but **ends the turn immediately**                      |
+| Dry is punishment | Empty well / empty bank → only **Fist Fight** (or Meditate to claw mana back); the joke is on you |
 
 
 ### Baseline advantages
@@ -29,9 +30,9 @@ The Warlock fights from mid range with a finite mana pool. Before a real strike,
 | ------------------ | -------------------------------------------------------------- |
 | High reach         | Mid-range glass cannon — can threaten before melee closes      |
 | Scalable burst     | Committed mana turns one action into a fight-swinging hit      |
-| Panic shield       | Mana Shield blocks hits from bank (`1` per `mana_cost`) — or Overload soak for up to **3 unit turns** / until own turn |
+| Panic shield       | Mana Shield is **free**; blocks hits from bank — or Overload soak for up to **3 unit turns** / until own turn |
 | Always has a basic | Dry → **Fist Fight** — still acts, in the saddest way possible |
-| Deep pool          | ~100 mana supports several meaningful charges if rationed      |
+| Recover option     | **Meditate** buys back half the well, but ends the turn                                |
 
 
 ### Baseline disadvantages
@@ -39,10 +40,10 @@ The Warlock fights from mid range with a finite mana pool. Before a real strike,
 
 | Disadvantage               | Why it matters                                                           |
 | -------------------------- | ------------------------------------------------------------------------ |
-| No mana regen              | Every Draw is permanent for the battle — no Warrior-style recovery       |
+| No free mana regen         | No Warrior-style turn-start refill — Meditate costs the whole turn               |
 | Fragile                    | Low HP — mistakes and focus fire end the unit                            |
 | Short legs                 | Low–Mid move — needs positioning help; kiting hurts                      |
-| Commitment is irreversible | Drawn mana leaves the well permanently — you cannot un-commit mid-battle |
+| Commitment is irreversible | Drawn mana leaves the well until Meditate (or battle end) — you cannot un-Draw mid-cast |
 | Empty = irrelevant         | Dry Warlock is a melee slapstick act, not a backline threat              |
 
 
@@ -55,12 +56,13 @@ Warlock is **not** a code subclass. Identity comes from spawn data + ability kit
 ```
 UnitStats
   ├── core combat stats (HP, damage, speed, move_range, …)
-  ├── resource_id = MANA, max_resource = 100
+  ├── resource_id = MANA, max_resource = 50
   └── abilities[]
         ├── SimpleMoveAbilityData              (Walk)
         ├── WarlockDrawManaAbilityData         (Draw — banks drawn mana on itself)
         ├── WarlockChargedBoltAbilityData      (Charged Bolt — spends Draw bank; may Overload)
-        ├── WarlockManaShieldAbilityData       (Mana Shield — block hits; may Overload)
+        ├── WarlockManaShieldAbilityData       (Mana Shield — free; block hits; may Overload)
+        ├── WarlockMeditateAbilityData         (Meditate — +½ max mana, ends turn)
         └── WarlockFistFightAbilityData        (Fist Fight — dry / free melee flop)
 ```
 
@@ -68,10 +70,11 @@ UnitStats
 | Layer                     | Owns                                                                |
 | ------------------------- | ------------------------------------------------------------------- |
 | `Unit`                    | Generic resource API (`get` / `spend` / `gain` / `refill`)          |
-| `UnitStats` / spawn setup | Class defaults (MANA, max 100, ability list)                        |
+| `UnitStats` / spawn setup | Class defaults (MANA, max 50, ability list)                         |
 | **Draw ability**          | Pulls from the well into **its own** `drawn_mana` bank              |
 | Cast abilities            | Require `mana_cost`; **default: spend entire Draw bank**; Overload  |
-| Mana Shield               | Raise via ACTION; block via `on_incoming_damage` while active       |
+| Mana Shield               | Raise as free action; block via `on_incoming_damage` while active   |
+| Meditate                  | ACTION that restores half max mana then ends the turn               |
 | Fist Fight ability        | Free melee desperation attack; independent of Draw bank             |
 | `CombatSystem`            | Hit/damage math (unchanged by class; Fist Fight passes a miss rule) |
 
@@ -133,7 +136,7 @@ From `DefaultBattleSetup._make_warlock_stats()`:
 | Accuracy            | 100      | Deterministic hits before cover/falloff                                                                           |
 | Damage              | 8        | **Fist Fight** punch damage; Charged Bolt scales from Draw bank                                                   |
 | Max HP              | 75       | Low — Sniper-like fragility                                                                                       |
-| Resource            | Mana 100 | Starts full; **no** passive recharge                                                                              |
+| Resource            | Mana **50** | Starts full; **no** passive recharge — Meditate is the only well refill                                                                              |
 | Attack range        | 4        | Mid-range identity (High enough to threaten; shorter than pure sniper 5 if we want a clearer mid band — tune 4–5) |
 | Move/action budgets | 1 / 1    | Same as other units                                                                                               |
 
@@ -153,31 +156,33 @@ Mana is a single pool (`BattleEnums.UnitResource.MANA`).
 | ------------------------------- | ------------------------------------------------------ | --------------------------------------- |
 | Draw                            | **`draw_amount`** (default **5**) from well            | Well → **Draw skill** `drawn_mana`      |
 | Charged Bolt (and most casts)   | **Entire** Draw bank (must be ≥ `mana_cost`)           | Dump bank into the spell — **not** the well |
-| Mana Shield                     | **Entire** Draw bank (must be ≥ `mana_cost`)           | Same dump rule; raises shield state     |
-| Fist Fight                      | **0**                                                  | Always (the humiliation option)         |
+| Mana Shield                     | **Entire** Draw bank (must be ≥ `mana_cost`)           | Same dump rule; raises shield (free action) |
+| Meditate                        | ACTION + end turn                                      | Restores half max mana into the well        |
+| Fist Fight                      | **0**                                                  | Always (the humiliation option)             |
 
 
 ### Gains
 
 
-| Event        | Amount                | Source       |
-| ------------ | --------------------- | ------------ |
-| Battle start | Full (`max_resource`) | `Unit.setup` |
-| Turn start   | **None**              | By design    |
+| Event        | Amount                              | Source       |
+| ------------ | ----------------------------------- | ------------ |
+| Battle start | Full (`max_resource`)               | `Unit.setup` |
+| Turn start   | **None**                            | By design    |
+| Meditate     | `floor(max_resource / 2)` (e.g. 25) | Well refill; ends turn |
 
 
-No stamina-style recharge passive. Any future refill is an explicit ability or item, not a turn tick.
+No stamina-style recharge passive. The only mid-battle well refill is **Meditate** (full turn tax).
 
 ### Soft caps & feel
 
-- Full mana **100** ≈ many Draws over the battle, but the **bank caps at 20** (4× Draw of 5).
+- Full mana **50** ≈ enough for a few bank fills (bank caps at 20 = 4× Draw of 5).
 - Typical charged hit: Draw up toward the cap (e.g. 15–20) → fire; Overload is reachable under the cap.
 - **Bank cap `max_drawn_mana = 20`** — commitment is still a choice, but one cast cannot eat the whole well.
 - Unused `drawn_mana` **persists across turns** on the Draw skill until a cast spends it.
-- Empty well → Draw disabled; bank full → Draw disabled; casts only if Draw bank ≥ `mana_cost`; otherwise **Fist Fight** (if someone is adjacent).
+- Empty well → Draw disabled; bank full → Draw disabled; casts only if Draw bank ≥ `mana_cost`; otherwise **Fist Fight** or **Meditate**.
 - Overhead HUD: mana bar under HP (HUD already has a MANA tint path).
 
-**Design tension:** every Draw permanently shrinks the well. Banking high commitment wins a fight early (and may Overload) and risks a useless late game; hoarding keeps options open but never spikes. Warrior asks “attack or soak this turn?”; Warlock asks “how much of this battle do I spend *now*?”
+**Design tension:** every Draw shrinks the well. Banking high commitment wins a fight early (and may Overload) and risks a dry late game; **Meditate** can claw half back but costs the entire turn. Warrior asks “attack or soak this turn?”; Warlock asks “how much of this battle do I spend *now*?”
 
 ---
 
@@ -261,7 +266,7 @@ Self buff. Spends the Draw bank to raise an occult barrier. Contrast Warrior sta
 
 | Field                | Value                                                                                         |
 | -------------------- | --------------------------------------------------------------------------------------------- |
-| Category / cost slot | `ACTION` / `ACTION`                                                                           |
+| Category / cost slot | `ACTION` / **`NONE`** (free — does not spend move or action)                                  |
 | Target               | Self                                                                                          |
 | Drawn-mana cost      | Requires `drawn_mana >= mana_cost`; **spends the whole bank** (`drawn_mana → 0`)              |
 | `mana_cost`          | Proposed **5**                                                                                |
@@ -297,6 +302,19 @@ remaining_unit_turns: int # Overload: countdown (default **3**)
 
 **Player-facing (before Overload unlock):** describe charge scaling (`1` block per `mana_cost` banked). Overload “lasts up to 3 unit turns, or until your next turn” unlocks when Draw bank hits this ability’s threshold.
 
+### Meditate — `warlock_meditate`
+
+Spend the turn channeling half the well back.
+
+| Field                | Value                                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| Category / cost slot | `ACTION` / `ACTION`                                                                           |
+| Target               | Self (`activates_on_select`)                                                                  |
+| Gate                 | Well not already full                                                                         |
+| Commit               | `gain_resource(floor(max_resource * 0.5), MANA)` then **immediately end the turn**            |
+
+Default with max 50 → **+25** mana. Forfeits leftover move and any further actions. The intended “claw back from dry” button — strong refill, brutal tempo cost.
+
 ### Fist Fight — `warlock_fist_fight`
 
 
@@ -323,15 +341,16 @@ The dry-out “basic.” Not a spell. The Warlock has run out of occult dignity 
 - Wants mid-distance sight lines and cover; dies quickly if Warriors/Scouts close.
 - Half/full cover reduce hit chance as usual; no Warrior-style “cannot melee full cover” rule unless we add one later.
 - Draw does not move or deal damage — pure free economy; action stays available for the bolt.
+- Mana Shield is also free — Draw → Shield → Draw again → Bolt is a legal (expensive) same-turn line.
 
 Typical loop:
 
 1. Move into mid-range cover
 2. Draw one or more times (−5 well → +5 on **Draw bank**) — free
-3. Charged Bolt **or** Mana Shield (ACTION; dumps Draw bank; Overload if over that spell’s threshold)
-4. Repeat while mana lasts; when empty, close to melee and **Fist Fight** (or hide and cry)
+3. Charged Bolt (ACTION) and/or Mana Shield (free; dumps Draw bank; Overload if over that spell’s threshold)
+4. Repeat while mana lasts; when empty, **Meditate** (end turn, +½ max) or close and **Fist Fight**
 
-Defensive line: Draw to shield threshold → Mana Shield (one big hit eaten, or Overload soak for up to **3 unit turns** / until your next turn) → later turns spend the well on bolts.
+Defensive line: Draw to shield threshold → Mana Shield (free; one big hit eaten, or Overload soak) → still free to Bolt same turn after redrawing.
 
 Aggressive line: Fill the Draw bank past Overload threshold → Charged Bolt Overload same turn — then pray the fight ends before you’re punching people at 50/50.
 
@@ -339,8 +358,8 @@ Aggressive line: Fill the Draw bank past Overload threshold → Charged Bolt Ove
 
 ## Player & AI notes
 
-- **Player:** Ability-first UI lists Walk, Draw, Charged Bolt, Mana Shield, Fist Fight. Casts disable when Draw’s `drawn_mana < mana_cost`. Draw disables when well &lt; `draw_amount` **or** bank would exceed `max_drawn_mana` (20). Fist Fight needs an adjacent enemy and will often whiff. Show **well mana**, **Draw bank**, and a clear **shield up** cue when Mana Shield is active. Overload tooltip text stays hidden until that ability’s threshold is reached, then unlocks.
-- **AI:** May use Overload knowingly (full rules). Prefer real casts while the bank/well allow; Shield when about to take a hit / low HP; Fist Fight only when dry and adjacent. Player-facing Overload text stays gated by unlock.
+- **Player:** Ability-first UI lists Walk, Draw, Charged Bolt, Mana Shield, Meditate, Fist Fight. Casts disable when Draw’s `drawn_mana < mana_cost`. Draw disables when well &lt; `draw_amount` **or** bank would exceed `max_drawn_mana` (20). Meditate disables at full mana and ends the turn on use. Fist Fight needs an adjacent enemy and will often whiff. Show **well mana**, **Draw bank**, and a clear **shield up** cue when Mana Shield is active. Overload tooltip text stays hidden until that ability’s threshold is reached, then unlocks.
+- **AI:** May use Overload knowingly (full rules). Prefer real casts while the bank/well allow; Shield when about to take a hit / low HP; Meditate when dry and not adjacent; Fist Fight only when dry and adjacent. Player-facing Overload text stays gated by unlock.
 
 ---
 
@@ -354,6 +373,7 @@ Aggressive line: Fill the Draw bank past Overload threshold → Charged Bolt Ove
 | Draw                | `scripts/abilities/warlock_draw_mana_ability_data.gd`            |
 | Charged Bolt        | `scripts/abilities/warlock_charged_bolt_ability_data.gd`         |
 | Mana Shield         | `scripts/abilities/warlock_mana_shield_ability_data.gd`          |
+| Meditate            | `scripts/abilities/warlock_meditate_ability_data.gd`             |
 | Fist Fight          | `scripts/abilities/warlock_fist_fight_ability_data.gd`           |
 | Resource API        | `scripts/units/unit.gd` (already generic)                        |
 | Resource enum       | `scripts/data/enums.gd` → `UnitResource.MANA` (already exists)   |
@@ -369,12 +389,13 @@ Aggressive line: Fill the Draw bank past Overload threshold → Charged Bolt Ove
 
 | Knob                 | Proposed | Effect when raised                            |
 | -------------------- | -------- | --------------------------------------------- |
-| `max_resource`       | 100      | Longer battle relevance                       |
+| `max_resource`       | 50       | Longer battle relevance                       |
 | `max_drawn_mana`     | 20       | Higher bank / bigger possible Overload dumps  |
 | `draw_amount`        | 5        | Coarser steps if raised; finer if lowered     |
 | `mana_cost`          | 5        | Higher minimum commit to cast                 |
 | `overload_threshold` | 15       | Overload harder / easier (keep **&lt; cap**)  |
 | `damage_per_mana`    | 2.0      | Stronger payoff per committed point           |
+| Meditate fraction    | 0.5      | How much of max mana the turn-tax refill gives |
 | Fist Fight `damage`  | 8        | How hard the humiliation slap hits            |
 | Fist Fight miss      | 50%      | Raise = funnier / more useless when dry       |
 | Shield Overload turns| 3        | Longer multi-hit soak window (unit turns)     |
@@ -405,7 +426,7 @@ Prototype target: Warlock should feel **scary when committing**, and **clearly s
 Not required for the prototype kit:
 
 - Alternate Draw skills (different amounts, risks, or verbs) — still deposit into the **default** Draw bank; see Architecture
-- Passive mana regen of any kind
+- Passive mana regen of any kind (Meditate is the intentional turn-tax exception)
 - Self-damage siphon / ally drain to refill the well
 - AoE, DoT, or summon spells
 - Stance toggles or cooldowns
@@ -419,7 +440,7 @@ Possible later abilities that still fit: other Draw variants, emergency self-hur
 
 ## Acceptance checklist
 
-- [x] Spawns with MANA resource (100) and warlock ability set
+- [x] Spawns with MANA resource (**50**) and warlock ability set
 - [x] No turn-start mana recharge
 - [x] Draw spends well mana (+5 default) into **Draw skill** `drawn_mana` (not into cast abilities)
 - [x] Draw bank persists across turns until a cast spends it
@@ -427,8 +448,9 @@ Possible later abilities that still fit: other Draw variants, emergency self-hur
 - [x] Overload when spent drawn mana > that cast’s `overload_threshold` (per-ability resolve path)
 - [x] Draw bank capped at `max_drawn_mana` (**20**)
 - [x] Overload effects differ by skill; tooltip locked until `drawn_mana >=` that ability’s `overload_threshold`, then unlocks
-- [x] Mana Shield: dumps Draw bank; blocks `floor(spent / mana_cost)` hits fully (no HP carryover)
+- [x] Mana Shield: free action; dumps Draw bank; blocks `floor(spent / mana_cost)` hits fully (no HP carryover)
 - [x] Mana Shield Overload: up to **3 unit turns** or Warlock’s own turn start (whichever first); full-blocks each hit while up
+- [x] Meditate: ACTION; restores half max mana then ends the turn
 - [x] Fist Fight: free ACTION, range 1, ~50% miss, works when dry
 - [x] Overhead HUD shows HP + well mana; Draw bank readable; Overload text gated by unlock
 - [ ] Tuned encounter where empty-mana → fist-fight failure is readable (and funny)
