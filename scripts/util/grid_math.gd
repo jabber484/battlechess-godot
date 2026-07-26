@@ -3,6 +3,12 @@ extends RefCounted
 
 const GRID_SIZE := 12
 const TILE_SIZE := 1.0
+## Cardinal step cost for movement pathfinding.
+const CARDINAL_COST := 1.0
+## Diagonal step cost (√2). Fractional costs accumulate along a path.
+const DIAGONAL_COST := 1.41421356237
+## Float slack when comparing path cost to move budget.
+const COST_EPSILON := 0.0001
 
 ## World origin is the center of the board.
 static func grid_to_world(grid_pos: Vector2i, height: float = 0.0) -> Vector3:
@@ -33,6 +39,30 @@ static func chebyshev(a: Vector2i, b: Vector2i) -> int:
 	return maxi(absi(a.x - b.x), absi(a.y - b.y))
 
 
+## Octile / Pythagorean path length on an open grid (min cost with 8-dir steps).
+static func octile(a: Vector2i, b: Vector2i) -> float:
+	var dx := absi(a.x - b.x)
+	var dy := absi(a.y - b.y)
+	var straight := maxi(dx, dy) - mini(dx, dy)
+	var diagonal := mini(dx, dy)
+	return CARDINAL_COST * float(straight) + DIAGONAL_COST * float(diagonal)
+
+
+## Edge cost for one 8-dir step. Cardinal = 1, diagonal = √2.
+static func step_cost(from_pos: Vector2i, to_pos: Vector2i) -> float:
+	var dx := absi(to_pos.x - from_pos.x)
+	var dy := absi(to_pos.y - from_pos.y)
+	if dx == 0 and dy == 0:
+		return 0.0
+	if dx <= 1 and dy <= 1:
+		return DIAGONAL_COST if dx == 1 and dy == 1 else CARDINAL_COST
+	return octile(from_pos, to_pos)
+
+
+static func cost_within_budget(cost: float, budget: float) -> bool:
+	return cost <= budget + COST_EPSILON
+
+
 static func orthogonal_neighbors(grid_pos: Vector2i) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	var offsets: Array[Vector2i] = [
@@ -45,7 +75,7 @@ static func orthogonal_neighbors(grid_pos: Vector2i) -> Array[Vector2i]:
 	return result
 
 
-## 8-directional neighbors (Chebyshev). Default for range and pathfinding.
+## 8-directional neighbors. Used for attack range rings and movement steps.
 static func chebyshev_neighbors(grid_pos: Vector2i) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	var offsets: Array[Vector2i] = [

@@ -116,7 +116,7 @@ Stamina is a single pool (`BattleEnums.UnitResource.STAMINA`).
 
 ### Walk — `simple_move`
 
-Shared move ability. Uses pathfinding + Chebyshev neighbors. Costs the **move** slot.
+Shared move ability. Uses pathfinding with octile step costs (diagonal ≈ √2). Costs the **move** slot.
 
 ### Melee — `warrior_basic_attack`
 

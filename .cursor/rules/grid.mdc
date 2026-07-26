@@ -1,16 +1,28 @@
 ---
-description: Grid distance and pathfinding use Chebyshev (diagonals) by default
+description: Grid distance — Chebyshev for range, octile cost for movement
 globs: scripts/util/grid_math.gd,scripts/systems/pathfinding_system.gd,scripts/systems/combat_system.gd,scripts/systems/ai_system.gd,scripts/abilities/**/*.gd
 alwaysApply: true
 ---
 
 # Grid distance & pathfinding
 
-**Default:** all range checks and movement paths use **Chebyshev** distance (8-directional — diagonals count as 1 tile), unless a feature explicitly opts out.
+## Attack range & adjacency — **Chebyshev**
+
+Discrete tile rings use **Chebyshev** (8-directional — diagonals count as 1 tile), unless a feature explicitly opts out.
 
 - Distance: `GridMath.chebyshev(a, b)` — `max(|dx|, |dy|)`
-- Neighbors / BFS steps: `GridMath.chebyshev_neighbors(pos)`
-- Attack range, move reachability, and `PathfindingSystem` paths all follow this
-- Prefer Chebyshev over Manhattan for new combat/movement logic
+- Neighbors: `GridMath.chebyshev_neighbors(pos)`
+- Attack range, adjacency, and distance falloff all use this
+- Opt-out only when specified (e.g. orthogonal-only ability): `GridMath.manhattan` / `GridMath.orthogonal_neighbors`, documented on that ability
 
-**Opt-out only when specified** (e.g. an ability that must be orthogonal-only). Then use `GridMath.manhattan` / `GridMath.orthogonal_neighbors` and document why on that ability.
+## Movement — **octile / Pythagorean cost**
+
+Path reachability and path length use **weighted 8-dir steps** with fractional accumulation:
+
+- Cardinal step: `GridMath.CARDINAL_COST` (`1`)
+- Diagonal step: `GridMath.DIAGONAL_COST` (`√2 ≈ 1.414`)
+- Edge cost: `GridMath.step_cost(from, to)`
+- Open-grid length: `GridMath.octile(a, b)`
+- `PathfindingSystem` runs Dijkstra; a tile is reachable if path cost `≤ unit.move_range`
+
+Do **not** use Chebyshev step-count (`dist + 1`) for move budgets.

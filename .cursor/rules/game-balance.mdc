@@ -12,5 +12,5 @@ alwaysApply: false
 - Without other factors (distance, cover, status, etc.), attacks are **deterministic** (always hit).
 - Miss chance comes only from situational modifiers (and ability-specific falloff), not from a base accuracy deficit.
 - Attack `attack_range` and distance falloff (`distance_penalty_per_tile`) live on the attack ability, not the unit.
-- Range and movement use Chebyshev (diagonals) by default — see `grid.mdc`.
+- Attack range uses Chebyshev; movement uses octile (√2 diagonal) cost — see `grid.mdc`.
 

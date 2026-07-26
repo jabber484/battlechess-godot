@@ -20,7 +20,7 @@ Damage, accuracy, and class resources (stamina, etc.) live in per-class docs —
 
 ### Prototype numeric guide
 
-Chebyshev tiles for move/attack range. Tune bands if the map size changes.
+Attack range uses Chebyshev tiles; move budget uses octile path cost (diagonal ≈ √2). Tune bands if the map size changes.
 
 | Stat         | Low  | Mid      | High  |
 | ------------ | ---- | -------- | ----- |

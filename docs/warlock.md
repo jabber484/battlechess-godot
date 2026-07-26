@@ -185,7 +185,7 @@ No stamina-style recharge passive. Any future refill is an explicit ability or i
 
 ### Walk — `simple_move`
 
-Shared move ability. Pathfinding + Chebyshev neighbors. Costs the **move** slot.
+Shared move ability. Pathfinding with octile step costs (diagonal ≈ √2). Costs the **move** slot.
 
 ### Draw — `warlock_draw_mana`
 
