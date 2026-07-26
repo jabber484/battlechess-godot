@@ -1,11 +1,16 @@
 class_name WarlockManaShieldAbilityData
 extends AbilityData
 
-## Raise a full-block barrier by dumping the Draw bank. Overload: multi-hit soak on a unit-turn timer.
+## Mana Shield — raise a full-block barrier by dumping the Draw bank.
 ##
+## Slot: ACTION / CostSlot.ACTION; self-cast, runs on ability-bar click (`activates_on_select`).
+## Cost: requires Draw bank ≥ `mana_cost`, then spends the **whole** bank.
+## Normal (spent ≤ `overload_threshold`): blocks **1** damaging hit fully (no HP carryover).
+## Overload (spent > threshold): blocks every damaging hit while up.
 ## Expiry (whichever comes first for the active mode):
-## - Normal: after blocking **1** damaging hit
-## - Overload: after **3 other units' turn starts**, OR immediately when the Warlock's **own turn starts**
+## - Normal: after blocking 1 hit, OR when the Warlock's own turn starts
+## - Overload: after `overload_unit_turns` other units' turn starts, OR own turn start
+## UI: overhead SHIELD label + combat log on block / fade.
 
 @export var mana_cost: int = 5
 @export var overload_threshold: int = 15

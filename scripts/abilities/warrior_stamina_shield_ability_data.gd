@@ -1,6 +1,12 @@
 class_name WarriorStaminaShieldAbilityData
 extends AbilityData
 
+## Stamina Shield — passive soak: spend stamina 1:1 to reduce incoming HP damage.
+##
+## Category: PASSIVE (always on while stamina remains).
+## Hook: `on_incoming_damage` via `Unit.modify_incoming_damage`.
+## Rule: soak = min(final_damage, current_stamina); spend that stamina; reduce final_damage.
+## Misses never reach this path. Empty stamina → no soak until recharge.
 
 func _init() -> void:
 	id = &"warrior_stamina_shield"

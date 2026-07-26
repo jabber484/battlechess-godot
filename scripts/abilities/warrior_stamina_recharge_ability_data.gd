@@ -1,7 +1,13 @@
 class_name WarriorStaminaRechargeAbilityData
 extends AbilityData
 
-@export var recharge_amount: int = 10
+## Stamina Recharge — passive restore on the Warrior's turn start.
+##
+## Category: PASSIVE.
+## Hook: `on_turn_started` → gain `recharge_amount` stamina (clamped to max).
+## Default +30 / turn ≈ Melee cost (10) plus leftover stamina for shield soak the same turn.
+
+@export var recharge_amount: int = 30
 
 
 func _init() -> void:

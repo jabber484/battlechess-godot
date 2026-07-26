@@ -1,6 +1,13 @@
 class_name WarriorBasicAttackAbilityData
 extends SimpleAttackAbilityData
 
+## Melee — Warrior basic adjacent attack.
+##
+## Slot: ACTION / CostSlot.ACTION.
+## Target: adjacent enemy (Chebyshev range 1); cannot target directional full cover.
+## Cost: `stamina_cost` from the STAMINA resource (default 10).
+## Damage / hit: unit damage and accuracy; no distance falloff at range 1.
+
 @export var stamina_cost: int = 10
 
 

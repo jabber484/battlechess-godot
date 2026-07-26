@@ -1,7 +1,14 @@
 class_name WarlockFistFightAbilityData
 extends SimpleAttackAbilityData
 
-## Dry-out melee flop — free of mana / Draw bank, coin-flip miss, adjacent only.
+## Fist Fight — dry-out melee desperation attack.
+##
+## Slot: ACTION / CostSlot.ACTION.
+## Target: adjacent enemy only (Chebyshev range 1).
+## Cost: none — never touches the mana well or Draw bank.
+## Hit: flat `flat_hit_chance` (default 50%); damage = unit `damage`.
+## Availability: listed / usable only when well mana is 0 (empty well).
+## Tone: intentional slapstick basic when the Warlock is spent.
 
 @export var flat_hit_chance: int = 50
 

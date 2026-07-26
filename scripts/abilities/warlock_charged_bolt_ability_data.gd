@@ -1,7 +1,15 @@
 class_name WarlockChargedBoltAbilityData
 extends SimpleAttackAbilityData
 
-## Mid-range bolt that dumps the entire Draw bank. Overload: 150% damage.
+## Charged Bolt — mid-range nuke that dumps the entire Draw bank.
+##
+## Slot: ACTION / CostSlot.ACTION.
+## Target: enemy in attack range (default 4, Euclidean).
+## Cost: requires Draw bank ≥ `mana_cost`, then spends the **whole** bank (`drawn_mana → 0`).
+## Damage: `floor(spent * damage_per_mana)`; Overload when spent > `overload_threshold`
+## multiplies by `overload_damage_mult` (150%).
+## Overload tooltip unlocks the first time Draw bank reaches `overload_threshold`.
+## Selectable only with bank + at least one in-range enemy.
 
 @export var mana_cost: int = 5
 @export var overload_threshold: int = 15

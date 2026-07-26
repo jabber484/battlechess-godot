@@ -1,7 +1,14 @@
 class_name WarlockDrawManaAbilityData
 extends AbilityData
 
-## Free-action Draw: pulls from the mana well into this ability's bank.
+## Draw — free-action mana channel.
+##
+## Slot: ACTION / CostSlot.NONE (does not spend move or action).
+## Target: self; runs immediately on ability-bar click (`activates_on_select`).
+## Effect: spend `draw_amount` from the mana well into this ability's `drawn_mana` bank
+## (cap `max_drawn_mana`). Bank persists across turns until a cast dumps it.
+## Gate: well has enough mana and bank has room for another draw tick.
+## Note: this is the default Draw-bank provider; casts resolve through `WarlockDrawBank`.
 
 @export var draw_amount: int = 5
 @export var max_drawn_mana: int = 20

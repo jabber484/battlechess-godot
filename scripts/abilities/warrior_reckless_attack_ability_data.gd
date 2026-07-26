@@ -1,7 +1,14 @@
 class_name WarriorRecklessAttackAbilityData
 extends WarriorBasicAttackAbilityData
 
-## Once-per-turn free-action melee: spend stamina, enemy strikes first, then Warrior hits.
+## Reckless — once-per-turn free-action melee: enemy strikes first, then Warrior hits.
+##
+## Slot: ACTION / CostSlot.NONE (does not spend the action budget).
+## Target: same as Melee (adjacent, not directional full cover).
+## Cost: `stamina_cost` stamina; once per own turn (`used_this_turn`, cleared on turn start).
+## Resolve: spend stamina → target interrupt attack → Warrior melee if still able.
+## Retaliation does not consume the enemy's turn / action budget.
+
 var used_this_turn: bool = false
 
 

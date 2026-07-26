@@ -1,6 +1,13 @@
 class_name SimpleAttackAbilityData
 extends AbilityData
 
+## Attack (Shoot) — generic ranged basic attack.
+##
+## Slot: ACTION / CostSlot.ACTION.
+## Target: living enemy within `attack_range` (default metric EUCLIDEAN).
+## Hit: unit accuracy minus distance falloff (`distance_penalty_per_tile` × (N−1)) and cover.
+## Damage: unit `damage`. Subclasses specialize cost, range metric, and gates.
+
 @export var attack_range: int = 5
 ## Hit-chance reduction per tile beyond adjacent (distance uses N-1). 0 = no falloff.
 @export var distance_penalty_per_tile: int = 5

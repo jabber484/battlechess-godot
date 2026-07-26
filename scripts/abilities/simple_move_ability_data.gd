@@ -1,6 +1,12 @@
 class_name SimpleMoveAbilityData
 extends AbilityData
 
+## Move (Walk) — shared pathfinding move ability.
+##
+## Slot: MOVE / CostSlot.MOVE (spends the move budget).
+## Target: tiles reachable within `unit.move_range` using octile step costs (diagonal ≈ √2).
+## Presentation: path tween via `BattleEnums.Presentation.MOVE`.
+
 func _init() -> void:
 	id = &"simple_move"
 	display_name = "Move"
