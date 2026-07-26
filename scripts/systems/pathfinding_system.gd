@@ -16,7 +16,7 @@ func get_reachable_tiles(unit: Unit) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	if unit == null or unit.is_dead():
 		return result
-	var budget := float(unit.move_range)
+	var budget := unit.movement_remaining
 	var costs := _dijkstra_costs(unit.grid_pos, unit, budget)
 	for pos in costs:
 		var cost: float = costs[pos]

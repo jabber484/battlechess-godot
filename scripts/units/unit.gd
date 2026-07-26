@@ -2,6 +2,7 @@ class_name Unit
 extends Node3D
 
 const _DamageContextRes = preload("res://scripts/data/damage_context.gd")
+const GridMathScript := preload("res://scripts/util/grid_math.gd")
 
 signal died(unit: Unit)
 signal hp_changed(unit: Unit, current_hp: int, max_hp: int)
@@ -22,7 +23,6 @@ signal incoming_damage(context)
 @export var accuracy: int = 100
 @export var damage: int = 25
 @export var max_hp: int = 100
-@export var max_moves: int = 1
 @export var max_actions: int = 1
 @export var resource_id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE
 @export var max_resource: int = 0
@@ -30,7 +30,7 @@ signal incoming_damage(context)
 var grid_pos: Vector2i = Vector2i.ZERO
 var current_hp: int = 100
 var current_resource: int = 0
-var moves_used: int = 0
+var movement_remaining: float = 4.0
 var actions_used: int = 0
 var death_processed: bool = false
 var abilities: Array[AbilityData] = []
@@ -42,6 +42,7 @@ var abilities: Array[AbilityData] = []
 func _ready() -> void:
 	current_hp = max_hp
 	current_resource = max_resource if has_resource() else 0
+	movement_remaining = float(move_range)
 	_apply_team_color()
 	_update_world_position()
 	_refresh_hud()
@@ -62,8 +63,6 @@ func setup(p_team: BattleEnums.Team, p_pos: Vector2i, stats: Dictionary = {}) ->
 		damage = stats["damage"]
 	if stats.has("max_hp"):
 		max_hp = stats["max_hp"]
-	if stats.has("max_moves"):
-		max_moves = stats["max_moves"]
 	if stats.has("max_actions"):
 		max_actions = stats["max_actions"]
 	if stats.has("resource_id"):
@@ -77,6 +76,7 @@ func setup(p_team: BattleEnums.Team, p_pos: Vector2i, stats: Dictionary = {}) ->
 				abilities.append((ability as AbilityData).duplicate(true) as AbilityData)
 	current_hp = max_hp
 	current_resource = max_resource if has_resource() else 0
+	movement_remaining = float(move_range)
 	_apply_team_color()
 	_update_world_position()
 	_refresh_hud()
@@ -137,12 +137,8 @@ func is_alive() -> bool:
 
 
 func reset_turn_flags() -> void:
-	moves_used = 0
+	movement_remaining = float(move_range)
 	actions_used = 0
-
-
-func get_moves_remaining() -> int:
-	return maxi(0, max_moves - moves_used)
 
 
 func get_actions_remaining() -> int:
@@ -150,7 +146,13 @@ func get_actions_remaining() -> int:
 
 
 func can_move_more() -> bool:
-	return moves_used < max_moves
+	return GridMathScript.cost_within_budget(GridMathScript.CARDINAL_COST, movement_remaining)
+
+
+func spend_movement(cost: float) -> void:
+	if cost <= 0.0:
+		return
+	movement_remaining = maxf(0.0, movement_remaining - cost)
 
 
 func can_act_more() -> bool:

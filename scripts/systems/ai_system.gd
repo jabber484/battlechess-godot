@@ -166,8 +166,10 @@ func _score_tile(unit: Unit, tile: Vector2i, players: Array[Unit]) -> int:
 
 func _instant_move(unit: Unit, to_pos: Vector2i) -> void:
 	var from := unit.grid_pos
+	var path: Array[Vector2i] = pathfinding.find_path(from, to_pos, unit)
+	var cost: float = GridMath.path_cost(path) if path.size() >= 2 else GridMath.step_cost(from, to_pos)
 	grid_system.move_occupant(from, to_pos, unit)
-	turn_manager.notify_moved(unit)
+	turn_manager.notify_moved(unit, cost)
 
 
 func _primary_attack_distance_penalty(unit: Unit) -> int:

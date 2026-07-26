@@ -10,12 +10,12 @@ alwaysApply: false
 
 - Abilities are `AbilityData` Resources under `scripts/abilities/`. They define **behavior and rules**, not combat stats.
 - Units own an `Array[AbilityData]`. Attach via `UnitStats.abilities`; `Unit.setup` **duplicates** ability resources per instance.
-- Core combat stats (`move_range`, `accuracy`, `damage`, HP, move/action budgets, …) live on **`Unit` / `UnitStats`**. Attack **range** (`attack_range` + `range_metric`) and **distance falloff** live on the attack ability; abilities still read damage/accuracy from the unit.
+- Core combat stats (`move_range`, `accuracy`, `damage`, HP, action budget, …) live on **`Unit` / `UnitStats`**. Per-turn **movement remaining** starts at `move_range` and depletes by octile path cost. Attack **range** (`attack_range` + `range_metric`) and **distance falloff** live on the attack ability; abilities still read damage/accuracy from the unit.
 - Prefer the name **ability** (not skill) in code, paths, and docs.
 
 ## Required AbilityData API
 
-- Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION` | `PASSIVE`), `cost_slot` (`MOVE` → `notify_moved`, `ACTION` → `notify_acted`, `NONE` for passives)
+- Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION` | `PASSIVE`), `cost_slot` (`MOVE` → `notify_moved` with path cost / remaining movement points, `ACTION` → `notify_acted`, `NONE` for passives)
 - Methods: `can_activate(unit, ctx)`, `get_target_tiles(unit, ctx)`, `is_valid_target(unit, target_pos, ctx)`, `build_execution(unit, target_pos, ctx) -> Dictionary` (`commit` / `present` / `complete` / `death_units`)
 - Optional: `activates_on_select()` — if true, ability bar click runs immediately on self (no tile confirm); used by Warlock Draw and Mana Shield
 - Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` and/or `on_turn_started(unit)` when needed. `Unit.modify_incoming_damage` dispatches `on_incoming_damage` to **all** abilities (PASSIVE soak kits and ACTION abilities with raised block state). `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities. `Unit.notify_foreign_turn_started` dispatches `on_foreign_turn_started` when a different unit’s turn begins (duration countdowns).
@@ -88,7 +88,7 @@ if is_in_attack_range(unit.grid_pos, enemy.grid_pos):
 
 Standard abilities:
 
-- Walk: `SimpleMoveAbilityData` (`id = &"simple_move"`)
+- Walk: `SimpleMoveAbilityData` (`id = &"simple_move"`) — spends remaining movement by path cost; can activate again until range is exhausted
 - Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`) — `range_metric = EUCLIDEAN`
 - Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost; `CHEBYSHEV` range 1; cannot target directional full cover
 - Warrior reckless: `WarriorRecklessAttackAbilityData` (`id = &"warrior_reckless_attack"`) — free action (`CostSlot.NONE`), stamina cost, once per turn; enemy retaliates first then Warrior hits (`CHEBYSHEV`)
@@ -100,7 +100,8 @@ Standard abilities:
 - Warlock Meditate: `WarlockMeditateAbilityData` (`id = &"warlock_meditate"`) — ACTION; restore half max mana, then immediately end the turn
 - Warlock Fist Fight: `WarlockFistFightAbilityData` (`id = &"warlock_fist_fight"`) — dry melee, `CHEBYSHEV` range 1, flat 50% hit chance
 - Draw bank resolution: `WarlockDrawBank.get_provider(unit)` — casts never hard-code a bank ability id forever
-- `CostSlot.NONE`: free abilities (no move/action budget); `can_activate` still requires owning the turn
+- `CostSlot.NONE`: free abilities (no movement/action budget); `can_activate` still requires owning the turn
+- `CostSlot.MOVE`: gated by `unit.can_move_more()` (remaining movement ≥ one cardinal step); complete via `notify_moved(unit, path_cost)`
 - `CombatSystem.commit_attack(..., require_action, require_own_turn, damage_override, hit_chance_override, range_metric)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation; overrides for ability-scaled damage / flat miss; always pass the ability’s `range_metric`
 - `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities (passives and per-turn ACTION state)
 - Turn auto-end (`TurnManager._try_auto_finish`) stays open while **any** non-passive ability `can_activate` (wired via `keep_turn_open_check`)

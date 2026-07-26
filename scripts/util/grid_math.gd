@@ -88,6 +88,16 @@ static func cost_within_budget(cost: float, budget: float) -> bool:
 	return cost <= budget + COST_EPSILON
 
 
+## Sum of octile step costs along a path (consecutive tiles).
+static func path_cost(path: Array[Vector2i]) -> float:
+	if path.size() < 2:
+		return 0.0
+	var total := 0.0
+	for i in range(1, path.size()):
+		total += step_cost(path[i - 1], path[i])
+	return total
+
+
 static func orthogonal_neighbors(grid_pos: Vector2i) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	var offsets: Array[Vector2i] = [

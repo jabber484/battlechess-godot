@@ -85,7 +85,7 @@ func _resource_label(id: BattleEnums.UnitResource) -> String:
 
 
 func _refresh_flags(unit: Unit) -> void:
-	var move_txt := "Move %d/%d" % [unit.moves_used, unit.max_moves]
+	var move_txt := "Move %d/%d" % [int(floor(unit.movement_remaining)), unit.move_range]
 	var act_txt := "Action %d/%d" % [unit.actions_used, unit.max_actions]
 	var parts: PackedStringArray = PackedStringArray([move_txt, act_txt])
 	var shield := unit.get_mana_shield()

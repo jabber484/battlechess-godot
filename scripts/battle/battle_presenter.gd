@@ -267,7 +267,7 @@ func _enhance_self_buff(unit: Unit, execution: Dictionary) -> void:
 			if not overload:
 				var block_charges: int = int(spent_holder.get("charges", 0))
 				if block_charges <= 0:
-					block_charges = maxi(1, int(spent / 5))
+					block_charges = maxi(1, floori(spent / 5.0))
 				detail = "blocks %d hit%s" % [block_charges, "" if block_charges == 1 else "s"]
 			_battle_ui.append_log(
 				"%s %s Mana Shield (%s, spent %d)" % [unit.display_name, mode, detail, spent],

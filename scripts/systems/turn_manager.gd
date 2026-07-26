@@ -44,10 +44,10 @@ func can_act(unit: Unit) -> bool:
 	return phase == BattleEnums.TurnPhase.UNIT_TURN and unit == active_unit and unit.can_act_more() and not _busy
 
 
-func notify_moved(unit: Unit) -> void:
+func notify_moved(unit: Unit, cost: float) -> void:
 	if unit != active_unit:
 		return
-	unit.moves_used += 1
+	unit.spend_movement(cost)
 	unit_flags_changed.emit(unit)
 
 
