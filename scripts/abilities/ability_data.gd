@@ -33,6 +33,11 @@ func is_valid_target(_unit: Unit, _target_pos: Vector2i, _ctx: AbilityContext) -
 	return false
 
 
+## If true, selecting this ability in the UI runs it immediately (no tile confirm).
+func activates_on_select() -> bool:
+	return false
+
+
 ## Returns keys: commit, present, complete (Callable), death_units (Array[Unit]).
 ## Subclasses may add extras (e.g. path) for presentation helpers.
 func build_execution(
@@ -48,11 +53,17 @@ func build_execution(
 	}
 
 
-## Passive hook: mutate DamageContext before HP is applied.
+## Damage hook: mutate DamageContext before HP is applied.
+## Dispatched to all abilities (PASSIVE soak kits, and ACTION abilities with raised state).
 func on_incoming_damage(_unit: Unit, _context) -> void:
 	pass
 
 
-## Passive hook: called when this unit's turn begins.
+## Called when this unit's turn begins (passives and per-turn ACTION state).
 func on_turn_started(_unit: Unit) -> void:
+	pass
+
+
+## Called on this owner when a *different* unit's turn begins (e.g. duration countdowns).
+func on_foreign_turn_started(_owner: Unit, _starting_unit: Unit) -> void:
 	pass

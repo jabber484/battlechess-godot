@@ -18,7 +18,7 @@ enum CostSlot { MOVE, ACTION, NONE }
 
 enum UnitResource { NONE, STAMINA, MANA, ENERGY }
 
-enum Presentation { NONE, MOVE, ATTACK, RECKLESS_ATTACK }
+enum Presentation { NONE, MOVE, ATTACK, RECKLESS_ATTACK, DRAW, SELF_BUFF }
 
 const DIRECTION_VECTORS: Array[Vector2i] = [
 	Vector2i(0, -1), # NORTH

@@ -42,6 +42,8 @@ func _ready() -> void:
 	for unit in _units:
 		unit.hp_changed.connect(_on_unit_hp_changed)
 		unit.resource_changed.connect(_on_unit_resource_changed)
+		unit.status_fx_changed.connect(_on_unit_status_fx_changed)
+		unit.ability_log.connect(_on_unit_ability_log)
 	battle_state.register_units(_units)
 	turn_manager.register_units(_units)
 	turn_manager.keep_turn_open_check = _unit_has_available_ability
@@ -80,6 +82,13 @@ func _on_turn_started(unit: Unit) -> void:
 	_pending_attack_target = null
 	_selected_ability = null
 	_hovered_tile = Vector2i(-1, -1)
+	# Duration ticks on other units fire before the active unit's own turn-start hooks.
+	for other in _units:
+		if other == null or not other.is_alive():
+			continue
+		if other == unit:
+			continue
+		other.notify_foreign_turn_started(unit)
 	if unit:
 		unit.notify_turn_started()
 	battle_ui.set_active_unit(unit)
@@ -130,15 +139,35 @@ func _on_unit_resource_changed(
 	_current: int,
 	_max_resource: int,
 ) -> void:
-	if unit == turn_manager.active_unit and unit.is_player():
-		_refresh_ability_bar()
-		_refresh_highlights()
+	if unit == turn_manager.active_unit:
+		battle_ui.set_active_unit(unit)
+		if unit.is_player():
+			_refresh_ability_bar()
+			_refresh_highlights()
+
+
+func _on_unit_status_fx_changed(unit: Unit) -> void:
+	if unit == turn_manager.active_unit:
+		battle_ui.set_active_unit(unit)
+
+
+func _on_unit_ability_log(unit: Unit, message: String) -> void:
+	battle_ui.append_log(message, _log_color_for(unit))
+	battle_ui.set_status(message)
 
 
 func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int, hit_chance: int) -> void:
-	var msg := "%s shoots %s (%d%%): " % [attacker.display_name, defender.display_name, hit_chance]
+	var verb := "shoots"
+	if _selected_ability != null and _selected_ability.id == &"warlock_fist_fight":
+		verb = "fist-fights"
+	elif _selected_ability != null and _selected_ability.id == &"warlock_charged_bolt":
+		verb = "blasts"
+	var msg := "%s %s %s (%d%%): " % [attacker.display_name, verb, defender.display_name, hit_chance]
 	if hit:
-		msg += "HIT for %d" % damage
+		if damage > 0:
+			msg += "HIT for %d" % damage
+		else:
+			msg += "HIT (absorbed)"
 	else:
 		msg += "MISS"
 	battle_ui.set_status(msg)
@@ -147,6 +176,8 @@ func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int,
 		defender.show_miss_float()
 	battle_ui.set_hit_chance("")
 	_pending_attack_target = null
+	if attacker == turn_manager.active_unit:
+		battle_ui.set_active_unit(attacker)
 
 
 func _on_battle_ended(result: BattleEnums.BattleResult) -> void:
@@ -177,6 +208,17 @@ func _on_ability_selected(ability: AbilityData) -> void:
 		battle_ui.set_status("%s is not available" % ability.display_name)
 		_refresh_ability_bar()
 		return
+
+	# Self-targeted / instant abilities run on button click — no second confirm.
+	if ability.activates_on_select():
+		_selected_ability = null
+		_pending_attack_target = null
+		battle_ui.set_hit_chance("")
+		battle_ui.set_selected_ability(null)
+		grid_view.clear_highlights()
+		await _execute_ability(ability, active, active.grid_pos)
+		return
+
 	_selected_ability = ability
 	_pending_attack_target = null
 	battle_ui.set_hit_chance("")
@@ -198,7 +240,7 @@ func _on_tile_picked(grid_pos: Vector2i) -> void:
 	if active == null or not active.is_player():
 		return
 	if _selected_ability == null:
-		battle_ui.set_status("Select an ability first")
+		# No targeting step for free self-casts — ignore stray tile clicks.
 		return
 	if not _selected_ability.can_activate(active, _ability_ctx):
 		_clear_selected_ability()
@@ -290,6 +332,8 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 	# Free-action abilities do not call notify_acted/moved — still try auto-end after them.
 	turn_manager.request_auto_finish()
 	_pending_attack_target = null
+	if unit == turn_manager.active_unit:
+		battle_ui.set_active_unit(unit)
 	if _selected_ability and not _selected_ability.can_activate(unit, _ability_ctx):
 		_selected_ability = null
 	_refresh_ability_bar()
@@ -297,7 +341,20 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 	if unit.is_player() and not battle_state.is_over():
 		if turn_manager.active_unit != unit:
 			return
-		if _selected_ability:
+		if ability.id == &"warlock_draw_mana":
+			var bank: int = WarlockDrawBank.get_drawn(unit)
+			var max_bank: int = WarlockDrawBank.get_max_drawn(unit)
+			if ability.can_activate(unit, _ability_ctx):
+				battle_ui.set_status("Bank %d/%d — Draw again or choose a cast" % [bank, max_bank])
+			else:
+				battle_ui.set_status("Bank %d/%d — choose a cast, move, or End Turn" % [bank, max_bank])
+		elif ability.id == &"warlock_mana_shield":
+			var shield := unit.get_mana_shield()
+			if shield and shield.is_shield_up():
+				battle_ui.set_status("%s raised" % shield.get_shield_status_text())
+			else:
+				battle_ui.set_status("Select an ability, or End Turn")
+		elif _selected_ability:
 			battle_ui.set_status("Selected %s — choose a target" % _selected_ability.display_name)
 		else:
 			battle_ui.set_status("Select an ability, or End Turn")
@@ -312,6 +369,13 @@ func _player_abilities(unit: Unit) -> Array[AbilityData]:
 			continue
 		if ability.category == BattleEnums.AbilityCategory.PASSIVE:
 			continue
+		# Fist Fight is dry-only — omit from the bar while any mana remains.
+		if ability is WarlockFistFightAbilityData:
+			if (
+				not unit.has_resource(BattleEnums.UnitResource.MANA)
+				or unit.get_resource(BattleEnums.UnitResource.MANA) > 0
+			):
+				continue
 		result.append(ability)
 	return result
 
@@ -405,10 +469,23 @@ func _refresh_attack_hover_preview(unit: Unit) -> void:
 
 
 func _hit_chance_text(attacker: Unit, defender: Unit, ability: AbilityData) -> String:
+	if ability is WarlockFistFightAbilityData:
+		var flat: int = (ability as WarlockFistFightAbilityData).flat_hit_chance
+		return "Hit %d%%: flat Fist Fight miss chance" % flat
 	var breakdown := combat_system.explain_hit_chance(
 		attacker, defender, _distance_penalty_per_tile(ability)
 	)
-	return combat_system.format_hit_chance(breakdown)
+	var text := combat_system.format_hit_chance(breakdown)
+	if ability is WarlockChargedBoltAbilityData:
+		var bank: int = WarlockDrawBank.get_drawn(attacker)
+		var bolt: WarlockChargedBoltAbilityData = ability as WarlockChargedBoltAbilityData
+		var preview: int = int(floor(float(bank) * bolt.damage_per_mana))
+		if bank > bolt.overload_threshold:
+			preview = int(floor(float(preview) * bolt.overload_damage_mult))
+			text += " | dmg ~%d (Overload)" % preview
+		else:
+			text += " | dmg ~%d" % preview
+	return text
 
 
 func _refresh_move_hover_preview(unit: Unit) -> void:

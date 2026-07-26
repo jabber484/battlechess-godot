@@ -11,6 +11,8 @@ signal resource_changed(
 	current: int,
 	max_resource: int,
 )
+signal status_fx_changed(unit: Unit)
+signal ability_log(unit: Unit, message: String)
 signal incoming_damage(context)
 
 @export var team: BattleEnums.Team = BattleEnums.Team.PLAYER
@@ -238,8 +240,7 @@ func modify_incoming_damage(context) -> void:
 	for ability in abilities:
 		if ability == null:
 			continue
-		if ability.category != BattleEnums.AbilityCategory.PASSIVE:
-			continue
+		# PASSIVE soak kits and ACTION abilities with raised block state (e.g. Mana Shield).
 		ability.on_incoming_damage(self, context)
 
 
@@ -249,6 +250,30 @@ func notify_turn_started() -> void:
 			continue
 		# Passives (recharge, etc.) and ACTION kits with per-turn state (e.g. Reckless).
 		ability.on_turn_started(self)
+
+
+func notify_foreign_turn_started(starting_unit: Unit) -> void:
+	for ability in abilities:
+		if ability == null:
+			continue
+		ability.on_foreign_turn_started(self, starting_unit)
+
+
+func notify_status_fx_changed() -> void:
+	status_fx_changed.emit(self)
+
+
+func emit_ability_log(message: String) -> void:
+	if message.is_empty():
+		return
+	ability_log.emit(self, message)
+
+
+func get_mana_shield() -> WarlockManaShieldAbilityData:
+	for ability in abilities:
+		if ability is WarlockManaShieldAbilityData:
+			return ability as WarlockManaShieldAbilityData
+	return null
 
 
 func _build_damage_context(amount: int, attacker: Unit) -> RefCounted:

@@ -17,9 +17,11 @@ alwaysApply: false
 
 - Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION` | `PASSIVE`), `cost_slot` (`MOVE` → `notify_moved`, `ACTION` → `notify_acted`, `NONE` for passives)
 - Methods: `can_activate(unit, ctx)`, `get_target_tiles(unit, ctx)`, `is_valid_target(unit, target_pos, ctx)`, `build_execution(unit, target_pos, ctx) -> Dictionary` (`commit` / `present` / `complete` / `death_units`)
-- Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` and/or `on_turn_started(unit)` when needed. `Unit.modify_incoming_damage` dispatches to `PASSIVE` abilities; `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities (passives and per-turn ACTION state).
+- Optional: `activates_on_select()` — if true, ability bar click runs immediately on self (no tile confirm); used by Warlock Draw and Mana Shield
+- Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` and/or `on_turn_started(unit)` when needed. `Unit.modify_incoming_damage` dispatches `on_incoming_damage` to **all** abilities (PASSIVE soak kits and ACTION abilities with raised block state). `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities. `Unit.notify_foreign_turn_started` dispatches `on_foreign_turn_started` when a different unit’s turn begins (duration countdowns).
 - Use `AbilityContext` for system refs (`pathfinding`, `grid_system`, `turn_manager`, `battle_state`, `combat_system`). Abilities must not cache Node paths.
 - Execution may include intent for presentation: `presentation` (`BattleEnums.Presentation`), plus `path` / `defender`. Leave `present` empty so `BattlePresenter` fills camera/tweens. Do not reference `CameraRig` from abilities.
+- Optional attack execution keys: `damage_override` / `damage_resolver` (Callable → int), `hit_chance_override` (flat %).
 
 ## Dispatch
 
@@ -47,8 +49,13 @@ Standard abilities:
 - Warrior reckless: `WarriorRecklessAttackAbilityData` (`id = &"warrior_reckless_attack"`) — free action (`CostSlot.NONE`), stamina cost, once per turn; enemy retaliates first then Warrior hits
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
+- Warlock Draw: `WarlockDrawManaAbilityData` (`id = &"warlock_draw_mana"`) — free action (`NONE`); well → Draw bank (`drawn_mana`, cap 20)
+- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — dumps Draw bank; damage scales with spent; Overload = 150% damage
+- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — dumps Draw bank; full-blocks hits while raised; Overload = up to 3 unit turns
+- Warlock Fist Fight: `WarlockFistFightAbilityData` (`id = &"warlock_fist_fight"`) — dry melee, flat 50% hit chance
+- Draw bank resolution: `WarlockDrawBank.get_provider(unit)` — casts never hard-code a bank ability id forever
 - `CostSlot.NONE`: free abilities (no move/action budget); `can_activate` still requires owning the turn
-- `CombatSystem.commit_attack(..., require_action, require_own_turn)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation
+- `CombatSystem.commit_attack(..., require_action, require_own_turn, damage_override, hit_chance_override)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation; overrides for ability-scaled damage / flat miss
 - `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities (passives and per-turn ACTION state)
 - Turn auto-end (`TurnManager._try_auto_finish`) stays open while **any** non-passive ability `can_activate` (wired via `keep_turn_open_check`)
 

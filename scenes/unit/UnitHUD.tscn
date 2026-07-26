@@ -8,7 +8,7 @@ script = ExtResource("1_hud")
 
 [node name="SubViewport" type="SubViewport" parent="."]
 transparent_bg = true
-size = Vector2i(256, 80)
+size = Vector2i(256, 104)
 render_target_update_mode = 4
 
 [node name="Root" type="Control" parent="SubViewport"]
@@ -35,6 +35,16 @@ theme_override_colors/font_outline_color = Color(0.05, 0.05, 0.08, 1)
 theme_override_constants/outline_size = 5
 theme_override_font_sizes/font_size = 22
 text = "Unit"
+horizontal_alignment = 1
+
+[node name="ShieldLabel" type="Label" parent="SubViewport/Root/VBox"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_colors/font_outline_color = Color(0.05, 0.08, 0.2, 1)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 16
+text = "SHIELD"
 horizontal_alignment = 1
 
 [node name="HPBar" type="ProgressBar" parent="SubViewport/Root/VBox"]

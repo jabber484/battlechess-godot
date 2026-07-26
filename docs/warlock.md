@@ -1,7 +1,7 @@
 # Warlock — Design Doc
 
-Status: **design only (not implemented)**  
-Last updated: 2026-07-25  
+Status: **implemented (prototype)**  
+Last updated: 2026-07-26  
 Role: mid-range glass cannon whose **mana** is a deep, non-regenerating well — power comes from **drawing** into the Draw skill’s bank before you fire.
 
 Contrast: [Warrior](warrior.md) regenerates stamina every turn and shares it between attack and soak. Warlock never refills mana passively; empty is a lasting problem for that battle.
@@ -58,10 +58,10 @@ UnitStats
   ├── resource_id = MANA, max_resource = 100
   └── abilities[]
         ├── SimpleMoveAbilityData              (Walk)
-        ├── WarlockFistFightAbilityData        (Fist Fight — dry / free melee flop)
         ├── WarlockDrawManaAbilityData         (Draw — banks drawn mana on itself)
+        ├── WarlockChargedBoltAbilityData      (Charged Bolt — spends Draw bank; may Overload)
         ├── WarlockManaShieldAbilityData       (Mana Shield — block hits; may Overload)
-        └── WarlockChargedBoltAbilityData      (Charged Bolt — spends Draw bank; may Overload)
+        └── WarlockFistFightAbilityData        (Fist Fight — dry / free melee flop)
 ```
 
 
@@ -123,7 +123,7 @@ Impl: alternate Draws look up the default Draw-bank provider on the unit and cal
 
 ## Baseline stats
 
-Proposed spawn defaults (tune freely — pool depth is a balancing knob):
+From `DefaultBattleSetup._make_warlock_stats()`:
 
 
 | Stat                | Value    | Band / notes                                                                                                      |
@@ -250,7 +250,7 @@ Authoritative Overload effects still live in design/impl notes; player text only
 damage = floor(spent_drawn * damage_per_mana)
 ```
 
-Suggested default `damage_per_mana = 1.0` → 5 drawn ≈ 5 dmg, 20 ≈ 20, 40 ≈ 40. Overload may replace or modify this formula rather than only scaling the number.
+Suggested default `damage_per_mana = 1.0` → 5 drawn ≈ 5 dmg, 20 ≈ 20. **Overload (prototype):** `floor(spent * damage_per_mana * 1.5)` — 150% damage. Tooltip Overload text unlocks when Draw bank first reaches `overload_threshold`.
 
 Unit `damage` stat is **not** the primary lever for Charged Bolt; the Draw bank is.
 
@@ -347,6 +347,7 @@ Aggressive line: Fill the Draw bank past Overload threshold → Charged Bolt Ove
 | Concern             | Location (planned)                                               |
 | ------------------- | ---------------------------------------------------------------- |
 | Spawn / stats / kit | `scripts/data/default_battle_setup.gd` → `_make_warlock_stats()` |
+| Draw bank resolver  | `scripts/abilities/warlock_draw_bank.gd`                         |
 | Draw                | `scripts/abilities/warlock_draw_mana_ability_data.gd`            |
 | Charged Bolt        | `scripts/abilities/warlock_charged_bolt_ability_data.gd`         |
 | Mana Shield         | `scripts/abilities/warlock_mana_shield_ability_data.gd`          |
@@ -385,13 +386,13 @@ Prototype target: Warlock should feel **scary when committing**, and **clearly s
 
 ## Open questions (resolve while implementing)
 
-1. **Leftover bank at battle end / death:** Ignore leftover `drawn_mana` when the unit dies or the battle ends. Mid-battle, the bank **persists across turns** until a cast spends it.
-2. **Overload effect for Charged Bolt:** Still TBD (designer-only until unlock). Must differ from Mana Shield’s Overload.
-3. **Draws per turn:** Unlimited free Draws until action is spent / turn ends / bank is full? (**Lean: yes** — stop at `max_drawn_mana`.)
+1. **Leftover bank at battle end / death:** Ignore leftover `drawn_mana` when the unit dies or the battle ends. Mid-battle, the bank **persists across turns** until a cast spends it. **Resolved.**
+2. **Overload effect for Charged Bolt:** **Resolved (prototype)** — damage becomes `floor(spent * damage_per_mana * overload_damage_mult)` with `overload_damage_mult = 1.5` (150%). Distinct from Mana Shield’s duration Overload.
+3. **Draws per turn:** Unlimited free Draws until action is spent / turn ends / bank is full? (**Lean: yes** — stop at `max_drawn_mana`.) **Resolved.**
 4. **Spend rule:** **Resolved — most skills spend the whole bank.** Partial-sip casts are the exception and must say so explicitly.
 5. **Multi-spell turns:** Dumping the bank means you cannot fire two banked casts without Drawing again.
 6. **Multiple Draws:** **Resolved — all Draw skills store into the default Draw’s bank.**
-7. **Shield + multi-hit same action:** If one enemy ability hits twice, does each apply separately against charges? (**Lean: yes** — each damaging application is one “attack.”)
+7. **Shield + multi-hit same action:** If one enemy ability hits twice, does each apply separately against charges? (**Lean: yes** — each damaging application is one “attack.”) **Resolved.**
 8. **Shield Overload tick:** Decrement the 3-count on **other** units’ turn starts; always clear on the Warlock’s own turn start. (**Resolved** as whichever-first.)
 
 ---
@@ -415,17 +416,17 @@ Possible later abilities that still fit: other Draw variants, emergency self-hur
 
 ## Acceptance checklist
 
-- [ ] Spawns with MANA resource (100) and warlock ability set
-- [ ] No turn-start mana recharge
-- [ ] Draw spends well mana (+5 default) into **Draw skill** `drawn_mana` (not into cast abilities)
-- [ ] Draw bank persists across turns until a cast spends it
-- [ ] Most cast abilities require `drawn_mana >= mana_cost` then spend the **whole** Draw bank
-- [ ] Overload when spent drawn mana > that cast’s `overload_threshold` (per-ability resolve path)
-- [ ] Draw bank capped at `max_drawn_mana` (**20**)
-- [ ] Overload effects differ by skill; tooltip locked until `drawn_mana >=` that ability’s `overload_threshold`, then unlocks
-- [ ] Mana Shield: dumps Draw bank; blocks one hit fully (no HP carryover)
-- [ ] Mana Shield Overload: up to **3 unit turns** or Warlock’s own turn start (whichever first); full-blocks each hit while up
-- [ ] Fist Fight: free ACTION, range 1, ~50% miss, works when dry
-- [ ] Overhead HUD shows HP + well mana; Draw bank readable; Overload text gated by unlock
+- [x] Spawns with MANA resource (100) and warlock ability set
+- [x] No turn-start mana recharge
+- [x] Draw spends well mana (+5 default) into **Draw skill** `drawn_mana` (not into cast abilities)
+- [x] Draw bank persists across turns until a cast spends it
+- [x] Most cast abilities require `drawn_mana >= mana_cost` then spend the **whole** Draw bank
+- [x] Overload when spent drawn mana > that cast’s `overload_threshold` (per-ability resolve path)
+- [x] Draw bank capped at `max_drawn_mana` (**20**)
+- [x] Overload effects differ by skill; tooltip locked until `drawn_mana >=` that ability’s `overload_threshold`, then unlocks
+- [x] Mana Shield: dumps Draw bank; blocks one hit fully (no HP carryover)
+- [x] Mana Shield Overload: up to **3 unit turns** or Warlock’s own turn start (whichever first); full-blocks each hit while up
+- [x] Fist Fight: free ACTION, range 1, ~50% miss, works when dry
+- [x] Overhead HUD shows HP + well mana; Draw bank readable; Overload text gated by unlock
 - [ ] Tuned encounter where empty-mana → fist-fight failure is readable (and funny)
 - [ ] AI respects mana scarcity (optional)

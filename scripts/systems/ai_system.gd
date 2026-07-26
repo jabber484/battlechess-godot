@@ -96,6 +96,8 @@ func run_unit_turn(unit: Unit) -> void:
 			var occupant := grid_system.get_occupant(tile)
 			if occupant == null or not occupant.is_alive():
 				continue
+			if occupant.team == unit.team:
+				continue
 			if target_seen.has(occupant):
 				continue
 			if unit.resolve_ability(BattleEnums.AbilityCategory.ACTION, tile, ctx) == null:

@@ -56,16 +56,40 @@ func set_active_unit(unit: Unit) -> void:
 		active_label.text = "Active: —"
 		flags_label.text = ""
 		return
-	active_label.text = "Active: %s  HP %d/%d  Sp %d" % [
-		unit.display_name, unit.current_hp, unit.max_hp, unit.speed
+	var resource_txt := ""
+	if unit.has_resource():
+		var res_name := _resource_label(unit.resource_id)
+		resource_txt = "  %s %d/%d" % [res_name, unit.current_resource, unit.max_resource]
+	var bank := WarlockDrawBank.get_provider(unit)
+	var bank_txt := ""
+	if bank:
+		bank_txt = "  Bank %d/%d" % [bank.drawn_mana, bank.max_drawn_mana]
+	active_label.text = "Active: %s  HP %d/%d  Sp %d%s%s" % [
+		unit.display_name, unit.current_hp, unit.max_hp, unit.speed, resource_txt, bank_txt
 	]
 	_refresh_flags(unit)
+
+
+func _resource_label(id: BattleEnums.UnitResource) -> String:
+	match id:
+		BattleEnums.UnitResource.STAMINA:
+			return "Stamina"
+		BattleEnums.UnitResource.MANA:
+			return "Mana"
+		BattleEnums.UnitResource.ENERGY:
+			return "Energy"
+		_:
+			return "Res"
 
 
 func _refresh_flags(unit: Unit) -> void:
 	var move_txt := "Move %d/%d" % [unit.moves_used, unit.max_moves]
 	var act_txt := "Action %d/%d" % [unit.actions_used, unit.max_actions]
-	flags_label.text = "%s | %s" % [move_txt, act_txt]
+	var parts: PackedStringArray = PackedStringArray([move_txt, act_txt])
+	var shield := unit.get_mana_shield()
+	if shield and shield.is_shield_up():
+		parts.append(shield.get_shield_status_text())
+	flags_label.text = " | ".join(parts)
 
 
 func set_hit_chance(text: String) -> void:
@@ -111,8 +135,15 @@ func set_abilities(
 			continue
 		var button := Button.new()
 		button.text = ability.display_name
+		if ability is WarlockDrawManaAbilityData:
+			var draw: WarlockDrawManaAbilityData = ability as WarlockDrawManaAbilityData
+			button.text = "Draw (%d/%d)" % [draw.drawn_mana, draw.max_drawn_mana]
 		button.custom_minimum_size = Vector2(120, 36)
 		button.disabled = not bool(is_activatable.call(ability))
+		if ability.has_method("get_tooltip_text"):
+			button.tooltip_text = str(ability.get_tooltip_text())
+		elif ability is WarlockDrawManaAbilityData:
+			button.tooltip_text = "Pull mana from the well into the Draw bank (free)."
 		button.pressed.connect(_on_ability_button_pressed.bind(ability))
 		ability_bar.add_child(button)
 		_ability_buttons[ability] = button

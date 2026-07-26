@@ -9,6 +9,10 @@ const WarriorBasicAttackAbilityDataScript := preload("res://scripts/abilities/wa
 const WarriorRecklessAttackAbilityDataScript := preload("res://scripts/abilities/warrior_reckless_attack_ability_data.gd")
 const WarriorStaminaShieldAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_shield_ability_data.gd")
 const WarriorStaminaRechargeAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_recharge_ability_data.gd")
+const WarlockDrawManaAbilityDataScript := preload("res://scripts/abilities/warlock_draw_mana_ability_data.gd")
+const WarlockFistFightAbilityDataScript := preload("res://scripts/abilities/warlock_fist_fight_ability_data.gd")
+const WarlockManaShieldAbilityDataScript := preload("res://scripts/abilities/warlock_mana_shield_ability_data.gd")
+const WarlockChargedBoltAbilityDataScript := preload("res://scripts/abilities/warlock_charged_bolt_ability_data.gd")
 
 
 static func get_unit_spawns() -> Array[UnitSpawnData]:
@@ -16,7 +20,7 @@ static func get_unit_spawns() -> Array[UnitSpawnData]:
 		UnitSpawnData.new(
 			BattleEnums.Team.PLAYER,
 			Vector2i(10, 10),
-			_make_stats("Scout", 8, 5, 100, 22, 90),
+			_make_warlock_stats(),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.PLAYER,
@@ -79,5 +83,25 @@ static func _make_warrior_stats() -> UnitStatsData:
 	abilities.append(WarriorRecklessAttackAbilityDataScript.new())
 	abilities.append(WarriorStaminaShieldAbilityDataScript.new())
 	abilities.append(WarriorStaminaRechargeAbilityDataScript.new())
+	stats.abilities = abilities
+	return stats
+
+
+static func _make_warlock_stats() -> UnitStatsData:
+	var stats := UnitStatsData.new()
+	stats.display_name = "Warlock"
+	stats.speed = 5
+	stats.move_range = 3
+	stats.accuracy = 100
+	stats.damage = 8
+	stats.max_hp = 75
+	stats.resource_id = BattleEnums.UnitResource.MANA
+	stats.max_resource = 100
+	var abilities: Array[AbilityData] = []
+	abilities.append(SimpleMoveAbilityDataScript.new())
+	abilities.append(WarlockDrawManaAbilityDataScript.new())
+	abilities.append(WarlockChargedBoltAbilityDataScript.new())
+	abilities.append(WarlockManaShieldAbilityDataScript.new())
+	abilities.append(WarlockFistFightAbilityDataScript.new())
 	stats.abilities = abilities
 	return stats

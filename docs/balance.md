@@ -1,7 +1,7 @@
 # Unit Balance Bands
 
 Status: **prototype targets**  
-Last updated: 2026-07-25
+Last updated: 2026-07-26
 
 Rate class baselines on **Low / Mid / High** for the four mobilityâ€“survivability axes below. Use this when authoring new kits; concrete numbers are band guides, not hard locks.
 
@@ -36,7 +36,7 @@ Attack range uses Chebyshev tiles; move budget uses octile path cost (diagonal â
 | Unit    | HP   | Speed | Move range | Attack range |
 | ------- | ---- | ----- | ---------- | ------------ |
 | Warrior | Mid+ | Mid   | Mid        | Low          |
-| Scout   | Mid  | High  | High       | High         |
+| Warlock | Low  | Mid   | Low        | Mid          |
 | Raider  | Mid  | High  | Mid        | High         |
 | Guard   | Mid  | Mid   | Low        | High         |
 | Sniper  | Low  | Low   | Low        | High         |
@@ -48,12 +48,12 @@ Attack range uses Chebyshev tiles; move budget uses octile path cost (diagonal â
 | Unit    | HP  | Speed | Move | Attack |
 | ------- | --- | ----- | ---- | ------ |
 | Warrior | 110 | 5     | 4    | 1      |
-| Scout   | 90  | 8     | 5    | 5      |
+| Warlock | 75  | 5     | 3    | 4      |
 | Raider  | 85  | 7     | 4    | 5      |
 | Guard   | 100 | 5     | 3    | 5      |
 | Sniper  | 75  | 3     | 3    | 5      |
 
-Attack range comes from the attack ability (`warrior_basic_attack` = 1, `simple_attack` = 5).
+Attack range comes from the attack ability (`warrior_basic_attack` = 1, `warlock_charged_bolt` = 4, `simple_attack` = 5).
 
 ---
 
@@ -62,4 +62,4 @@ Attack range comes from the attack ability (`warrior_basic_attack` = 1, `simple_
 - Prefer clear **tradeoffs**: a High on one axis usually pairs with a Low on another (Sniper: High attack range, Low everything else).
 - Melee kits (attack range Low) should usually take Mid+ move so they can close; Warriors follow this.
 - Do not push Warrior HP to High â€” sustain is meant to come from stamina block awareness.
-- See [warrior.md](warrior.md) for Warrior-specific economy; see `.cursor/rules/game-balance.mdc` for hit-chance rules.
+- See [warrior.md](warrior.md) / [warlock.md](warlock.md) for class economies; see `.cursor/rules/game-balance.mdc` for hit-chance rules.

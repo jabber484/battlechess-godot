@@ -59,6 +59,10 @@ func enhance_execution(
 			_enhance_attack(unit, execution)
 		BattleEnums.Presentation.RECKLESS_ATTACK:
 			_enhance_reckless_attack(unit, execution)
+		BattleEnums.Presentation.DRAW:
+			_enhance_draw(unit, execution)
+		BattleEnums.Presentation.SELF_BUFF:
+			_enhance_self_buff(unit, execution)
 	return execution
 
 
@@ -115,12 +119,26 @@ func _enhance_attack(unit: Unit, execution: Dictionary) -> void:
 	var target: Unit = defender as Unit
 	var distance_penalty_per_tile := int(execution.get("distance_penalty_per_tile", 0))
 	var max_range := int(execution.get("attack_range", 0))
+	var hit_chance_override := int(execution.get("hit_chance_override", -1))
+	var damage_resolver: Variant = execution.get("damage_resolver", null)
 	execution["present"] = func() -> void:
 		focus_grid_pos(target.grid_pos)
 		await _host.get_tree().create_timer(ATTACK_FOCUS_DURATION).timeout
 		if _combat_system:
+			var damage_override := -1
+			if typeof(damage_resolver) == TYPE_CALLABLE and (damage_resolver as Callable).is_valid():
+				damage_override = int((damage_resolver as Callable).call())
+			elif execution.has("damage_override"):
+				damage_override = int(execution.get("damage_override", -1))
 			_combat_system.commit_attack(
-				unit, target, distance_penalty_per_tile, max_range
+				unit,
+				target,
+				distance_penalty_per_tile,
+				max_range,
+				true,
+				true,
+				damage_override,
+				hit_chance_override,
 			)
 		await _host.get_tree().create_timer(ATTACK_CAMERA_DELAY).timeout
 		focus_grid_pos(unit.grid_pos)
@@ -188,6 +206,50 @@ func _enhance_reckless_attack(unit: Unit, execution: Dictionary) -> void:
 					unit.display_name,
 					target.display_name,
 				],
+				_log_color_for(unit),
+			)
+
+
+func _enhance_draw(unit: Unit, execution: Dictionary) -> void:
+	var amount := int(execution.get("draw_amount", 0))
+	execution["present"] = func() -> void:
+		focus_grid_pos(unit.grid_pos)
+		await _host.get_tree().create_timer(0.5).timeout
+	if _battle_ui:
+		var prior_complete: Callable = execution.get("complete", Callable())
+		execution["complete"] = func() -> void:
+			if prior_complete.is_valid():
+				prior_complete.call()
+			var bank: int = WarlockDrawBank.get_drawn(unit)
+			_battle_ui.append_log(
+				"%s draws %d mana (bank %d)" % [unit.display_name, amount, bank],
+				_log_color_for(unit),
+			)
+
+
+func _enhance_self_buff(unit: Unit, execution: Dictionary) -> void:
+	execution["present"] = func() -> void:
+		focus_grid_pos(unit.grid_pos)
+		await _host.get_tree().create_timer(0.45).timeout
+	if _battle_ui:
+		var prior_complete: Callable = execution.get("complete", Callable())
+		var spent_holder: Variant = execution.get("spent_drawn", {})
+		execution["complete"] = func() -> void:
+			if prior_complete.is_valid():
+				prior_complete.call()
+			var spent := 0
+			var overload := false
+			if typeof(spent_holder) == TYPE_DICTIONARY:
+				spent = int(spent_holder.get("spent", 0))
+				overload = bool(spent_holder.get("overload", false))
+			var mode := "Overload" if overload else "raised"
+			var detail := (
+				"up to %d unit turns / until own turn" % 3
+				if overload
+				else "blocks 1 hit"
+			)
+			_battle_ui.append_log(
+				"%s %s Mana Shield (%s, spent %d)" % [unit.display_name, mode, detail, spent],
 				_log_color_for(unit),
 			)
 

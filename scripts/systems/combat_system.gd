@@ -111,6 +111,8 @@ func commit_attack(
 	max_range: int,
 	require_action: bool = true,
 	require_own_turn: bool = true,
+	damage_override: int = -1,
+	hit_chance_override: int = -1,
 ) -> Dictionary:
 	var result := {
 		"hit": false,
@@ -121,13 +123,18 @@ func commit_attack(
 		attacker, defender, true, max_range, require_action, require_own_turn
 	):
 		return result
-	var chance := compute_hit_chance(attacker, defender, distance_penalty_per_tile)
+	var chance := (
+		clampi(hit_chance_override, 5, 100)
+		if hit_chance_override >= 0
+		else compute_hit_chance(attacker, defender, distance_penalty_per_tile)
+	)
 	result["hit_chance"] = chance
 	var roll := randi_range(1, 100)
 	var hit := roll <= chance
 	result["hit"] = hit
 	if hit:
-		var applied: int = defender.receive_damage(attacker.damage, attacker)
+		var raw_damage := damage_override if damage_override >= 0 else attacker.damage
+		var applied: int = defender.receive_damage(raw_damage, attacker)
 		result["damage"] = applied
 	attack_resolved.emit(attacker, defender, hit, int(result["damage"]), chance)
 	return result
