@@ -59,6 +59,19 @@ func on_incoming_damage(_unit: Unit, _context) -> void:
 	pass
 
 
+## Called after an attack against this owner fully resolves.
+## Useful for reactive effects that care about "was attacked" rather than raw damage mutation.
+func on_owner_attacked(
+	_owner: Unit,
+	_attacker: Unit,
+	_hit: bool,
+	_damage: int,
+	_hit_chance: int,
+	_combat_system,
+) -> void:
+	pass
+
+
 ## Called when this unit's turn begins (passives and per-turn ACTION state).
 func on_turn_started(_unit: Unit) -> void:
 	pass

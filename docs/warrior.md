@@ -47,6 +47,7 @@ UnitStats
   ??? abilities[]
         ??? WarriorMoveAbilityData         (Move ? Walk + stamina overspend)
         ??? WarriorBasicAttackAbilityData  (Melee)
+        ??? WarriorCounterAbilityData       (Counter — stamina, ends turn; block next adjacent hit + riposte)
         ??? WarriorBrawlAbilityData (Brawl ? free action, costs stamina; enemy hits first)
         ??? WarriorStaminaShieldAbilityData (passive)
         ??? WarriorStaminaRechargeAbilityData (passive)
@@ -94,6 +95,7 @@ Stamina is a single pool (`BattleEnums.UnitResource.STAMINA`).
 | Melee attack         | **10**                   | `WarriorBasicAttackAbilityData.stamina_cost` |
 | Brawl                | **10** stamina, **0** action slot | `WarriorBrawlAbilityData` ? free action; pay stamina + retaliation |
 | Move overspend       | **5 per overflow tile** (max +2) | `WarriorMoveAbilityData.stamina_per_tile` |
+| Counter              | **10** stamina, ends turn | `WarriorCounterAbilityData.stamina_cost` |
 | Incoming damage soak | **1 per 1 HP prevented** | `WarriorStaminaShieldAbilityData`            |
 
 ### Gains
@@ -177,6 +179,18 @@ Bonus melee on your turn: **does not use the ACTION slot** (`cost_slot = NONE`),
 - **Once per own turn:** hard rule. Track a used flag on the ability instance; clear on the Warrior?s turn start. Cannot Brawl twice in one turn even with leftover stamina.
 - **Turn auto-end:** Do not end the turn while **any** non-passive ability still `can_activate` (Move, Melee, Brawl, ?). Auto-end only when nothing remains usable.
 
+### Counter — `warrior_counter`
+
+Ready a melee parry: spend stamina and **end the turn immediately**. While Counter is up, the next hit from an attacker in **Chebyshev range 1** is fully blocked. After blocking, if the offender is still adjacent, the Warrior interrupt-attacks them (no action/turn budget). Hits from farther away do not consume Counter. Unused Counter clears at the start of the Warrior's next turn.
+
+| Field | Value |
+| ----- | ----- |
+| Category / cost slot | `ACTION` / `ACTION` |
+| Cast | Self (`activates_on_select`) |
+| Stamina | `stamina_cost` (default **10**) |
+| End turn | Yes — deferred `finish_turn` like Meditate |
+| Block | Next adjacent hit → `final_damage = 0` (before stamina soak) |
+| Riposte | Interrupt `commit_attack` if offender still in melee range |
 ### Stamina Shield ? `warrior_stamina_shield` (passive)
 
 On incoming damage (`Unit.modify_incoming_damage` ? `on_incoming_damage`):
@@ -212,7 +226,7 @@ Typical loop:
 
 ## Player & AI notes
 
-- **Player:** Ability-first UI lists non-passives (Move, Melee, Brawl). Move can spend stamina past normal range (up to +2). Melee / Brawl disable when out of range or out of stamina; Brawl also disables after one use until the Warrior?s next turn start. Brawl does not require an available ACTION.
+- **Player:** Ability-first UI lists non-passives (Move, Melee, Brawl, Counter). Move can spend stamina past normal range (up to +2). Melee / Brawl disable when out of range or out of stamina; Brawl also disables after one use until the Warrior?s next turn start. Brawl does not require an available ACTION.
 - **AI:** Resolves by category + `can_activate` / `is_valid_target`; first matching ability wins. Warrior AI currently uses the same generic heuristics as other units ? no dedicated ?preserve stamina? or ?when to Brawl? policy yet.
 
 ---
@@ -224,6 +238,7 @@ Typical loop:
 | Spawn / stats / kit | `scripts/data/default_battle_setup.gd` ? `_make_warrior_stats()` |
 | Move                | `scripts/abilities/warrior_move_ability_data.gd`                 |
 | Melee               | `scripts/abilities/warrior_basic_attack_ability_data.gd`         |
+| Counter             | `scripts/abilities/warrior_counter_ability_data.gd`             |
 | Brawl               | `scripts/abilities/warrior_brawl_ability_data.gd`                |
 | Shield              | `scripts/abilities/warrior_stamina_shield_ability_data.gd`       |
 | Recharge            | `scripts/abilities/warrior_stamina_recharge_ability_data.gd`     |
@@ -277,5 +292,6 @@ Possible later abilities that still fit the fantasy: shove, taunt/mark, spend st
 - [x] Overhead HUD shows HP + stamina
 - [x] Brawl: free action (`NONE`), costs stamina (10); enemy retaliates first; Warrior hits if still able
 - [x] Brawl once per own turn (flag cleared on turn start)
+- [x] Counter: spend stamina, end turn; block next adjacent hit + riposte if adjacent
 - [ ] Tuned encounter where empty-stamina failure is readable
 - [ ] AI respects stamina scarcity (optional)

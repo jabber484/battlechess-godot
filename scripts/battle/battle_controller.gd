@@ -183,6 +183,8 @@ func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int,
 	_pending_attack_target = null
 	if attacker == turn_manager.active_unit:
 		battle_ui.set_active_unit(attacker)
+	if defender != null:
+		defender.notify_attacked(attacker, hit, damage, hit_chance, combat_system)
 
 
 func _on_battle_ended(result: BattleEnums.BattleResult) -> void:
@@ -377,6 +379,12 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 			var shield := unit.get_mana_shield()
 			if shield and shield.is_shield_up():
 				battle_ui.set_status("%s raised" % shield.get_shield_status_text())
+			else:
+				battle_ui.set_status("Select an ability, or End Turn")
+		elif ability.id == &"warrior_counter":
+			var counter = unit.get_warrior_counter()
+			if counter and counter.is_counter_up():
+				battle_ui.set_status("Counter ready — turn ended")
 			else:
 				battle_ui.set_status("Select an ability, or End Turn")
 		elif _selected_ability:

@@ -2,6 +2,7 @@ class_name UnitHUD
 extends Node3D
 
 const DamageFloatScene := preload("res://scenes/unit/DamageFloat.tscn")
+const WarriorCounterAbilityDataScript := preload("res://scripts/abilities/warrior_counter_ability_data.gd")
 
 @onready var _viewport: SubViewport = $SubViewport
 @onready var _sprite: Sprite3D = $Sprite3D
@@ -94,11 +95,18 @@ func _refresh_shield() -> void:
 	if _unit == null:
 		_shield_label.visible = false
 		return
+	var text := ""
 	var shield := _unit.get_mana_shield()
-	if shield == null or not shield.is_shield_up():
+	if shield != null and shield.is_shield_up():
+		text = shield.get_shield_status_text()
+	else:
+		var counter = _unit.get_warrior_counter()
+		if counter != null and counter.is_counter_up():
+			text = counter.get_status_text()
+	if text.is_empty():
 		_shield_label.visible = false
 		return
-	_shield_label.text = shield.get_shield_status_text()
+	_shield_label.text = text
 	_shield_label.visible = true
 
 

@@ -8,6 +8,7 @@ const SimpleAttackAbilityDataScript := preload("res://scripts/abilities/simple_a
 const WarriorMoveAbilityDataScript := preload("res://scripts/abilities/warrior_move_ability_data.gd")
 const WarriorBasicAttackAbilityDataScript := preload("res://scripts/abilities/warrior_basic_attack_ability_data.gd")
 const WarriorBrawlAbilityDataScript := preload("res://scripts/abilities/warrior_brawl_ability_data.gd")
+const WarriorCounterAbilityDataScript := preload("res://scripts/abilities/warrior_counter_ability_data.gd")
 const WarriorStaminaShieldAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_shield_ability_data.gd")
 const WarriorStaminaRechargeAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_recharge_ability_data.gd")
 const WarlockDrawManaAbilityDataScript := preload("res://scripts/abilities/warlock_draw_mana_ability_data.gd")
@@ -83,6 +84,7 @@ static func _make_warrior_stats() -> UnitStatsData:
 	abilities.append(WarriorMoveAbilityDataScript.new())
 	abilities.append(WarriorBasicAttackAbilityDataScript.new())
 	abilities.append(WarriorBrawlAbilityDataScript.new())
+	abilities.append(WarriorCounterAbilityDataScript.new())
 	abilities.append(WarriorStaminaShieldAbilityDataScript.new())
 	abilities.append(WarriorStaminaRechargeAbilityDataScript.new())
 	stats.abilities = abilities

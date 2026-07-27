@@ -3,6 +3,7 @@ extends Node3D
 
 const _DamageContextRes = preload("res://scripts/data/damage_context.gd")
 const GridMathScript := preload("res://scripts/util/grid_math.gd")
+const WarriorCounterAbilityDataScript := preload("res://scripts/abilities/warrior_counter_ability_data.gd")
 
 signal died(unit: Unit)
 signal hp_changed(unit: Unit, current_hp: int, max_hp: int)
@@ -261,6 +262,19 @@ func notify_foreign_turn_started(starting_unit: Unit) -> void:
 		ability.on_foreign_turn_started(self, starting_unit)
 
 
+func notify_attacked(
+	attacker: Unit,
+	hit: bool,
+	damage_taken: int,
+	hit_chance: int,
+	combat_system,
+) -> void:
+	for ability in abilities:
+		if ability == null:
+			continue
+		ability.on_owner_attacked(self, attacker, hit, damage_taken, hit_chance, combat_system)
+
+
 func notify_status_fx_changed() -> void:
 	status_fx_changed.emit(self)
 
@@ -275,6 +289,13 @@ func get_mana_shield() -> WarlockManaShieldAbilityData:
 	for ability in abilities:
 		if ability is WarlockManaShieldAbilityData:
 			return ability as WarlockManaShieldAbilityData
+	return null
+
+
+func get_warrior_counter() -> WarriorCounterAbilityDataScript:
+	for ability in abilities:
+		if ability is WarriorCounterAbilityDataScript:
+			return ability as WarriorCounterAbilityDataScript
 	return null
 
 

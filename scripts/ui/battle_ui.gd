@@ -1,6 +1,8 @@
 class_name BattleUI
 extends CanvasLayer
 
+const WarriorCounterAbilityDataScript := preload("res://scripts/abilities/warrior_counter_ability_data.gd")
+
 signal end_turn_pressed
 signal ability_selected(ability: AbilityData)
 signal ability_hovered(ability: AbilityData)
@@ -91,6 +93,10 @@ func _refresh_flags(unit: Unit) -> void:
 	var shield := unit.get_mana_shield()
 	if shield and shield.is_shield_up():
 		parts.append(shield.get_shield_status_text())
+	else:
+		var counter = unit.get_warrior_counter()
+		if counter and counter.is_counter_up():
+			parts.append(counter.get_status_text())
 	flags_label.text = " | ".join(parts)
 
 
