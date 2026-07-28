@@ -5,6 +5,7 @@ const UnitSpawnData := preload("res://scripts/data/unit_spawn.gd")
 const UnitStatsData := preload("res://scripts/data/unit_stats.gd")
 const SimpleMoveAbilityDataScript := preload("res://scripts/abilities/simple_move_ability_data.gd")
 const SimpleAttackAbilityDataScript := preload("res://scripts/abilities/simple_attack_ability_data.gd")
+const SimpleMeleeAbilityDataScript := preload("res://scripts/abilities/simple_melee_ability_data.gd")
 const WarriorMoveAbilityDataScript := preload("res://scripts/abilities/warrior_move_ability_data.gd")
 const WarriorBasicAttackAbilityDataScript := preload("res://scripts/abilities/warrior_basic_attack_ability_data.gd")
 const WarriorBrawlAbilityDataScript := preload("res://scripts/abilities/warrior_brawl_ability_data.gd")
@@ -33,17 +34,17 @@ static func get_unit_spawns() -> Array[UnitSpawnData]:
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
 			Vector2i(1, 1),
-			_make_stats("Raider", 7, 4, 100, 20, 85),
+			_make_stats("Raider", 7, 4, 100, 20, 42),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
 			Vector2i(2, 1),
-			_make_stats("Guard", 5, 3, 100, 24, 100),
+			_make_melee_stats("Guard", 5, 3, 100, 24, 50),
 		),
 		UnitSpawnData.new(
 			BattleEnums.Team.ENEMY,
 			Vector2i(1, 2),
-			_make_stats("Sniper", 3, 3, 100, 28, 75),
+			_make_stats("Sniper", 3, 3, 100, 28, 38),
 		),
 	]
 
@@ -66,6 +67,28 @@ static func _make_stats(
 	var abilities: Array[AbilityData] = []
 	abilities.append(SimpleMoveAbilityDataScript.new())
 	abilities.append(SimpleAttackAbilityDataScript.new())
+	stats.abilities = abilities
+	return stats
+
+
+static func _make_melee_stats(
+	display_name: String,
+	speed: int,
+	move_range: int,
+	accuracy: int,
+	damage: int,
+	max_hp: int,
+) -> UnitStatsData:
+	var stats := UnitStatsData.new()
+	stats.display_name = display_name
+	stats.speed = speed
+	stats.move_range = move_range
+	stats.accuracy = accuracy
+	stats.damage = damage
+	stats.max_hp = max_hp
+	var abilities: Array[AbilityData] = []
+	abilities.append(SimpleMoveAbilityDataScript.new())
+	abilities.append(SimpleMeleeAbilityDataScript.new())
 	stats.abilities = abilities
 	return stats
 

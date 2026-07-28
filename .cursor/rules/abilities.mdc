@@ -89,6 +89,7 @@ if is_in_attack_range(unit.grid_pos, enemy.grid_pos):
 Standard abilities:
 
 - Walk: `SimpleMoveAbilityData` (`id = &"simple_move"`) — spends remaining movement by path cost; can activate again until range is exhausted
+- Melee (generic): `SimpleMeleeAbilityData` (`id = &"simple_melee"`) — `CHEBYSHEV` range 1, no resource cost; used by melee enemies (e.g. Guard)
 - Warrior Move: `WarriorMoveAbilityData` (`id = &"warrior_move"`) — replaces Walk on Warrior; same MOVE slot, plus up to `extra_range` (default 2) octile overspend at `stamina_per_tile` (default 5) per started overflow unit; extension capped per turn
 - Shoot: `SimpleAttackAbilityData` (`id = &"simple_attack"`) — `range_metric = EUCLIDEAN`
 - Warrior attack: `WarriorBasicAttackAbilityData` (`id = &"warrior_basic_attack"`) — stamina cost; `CHEBYSHEV` range 1; cannot target directional full cover

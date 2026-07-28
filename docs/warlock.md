@@ -1,10 +1,26 @@
 # Warlock — Design Doc
 
-Status: **implemented (prototype)**  
-Last updated: 2026-07-26  
+Status: **rework planned** (prototype still in code)  
+Last updated: 2026-07-28  
 Role: mid-range glass cannon whose **mana** is a finite well — power comes from **drawing** into the Draw skill’s bank before you fire. **Meditate** can buy back half the well at the cost of the whole turn.
 
 Contrast: [Warrior](warrior.md) regenerates stamina every turn and shares it between attack and soak. Warlock never refills mana passively; empty is a lasting problem for that battle.
+
+---
+
+## Why the current design fails
+
+The Draw → bank → cast loop and Meditate refill look like a commitment economy on paper. In play they collapse:
+
+| Problem | What happens |
+| ------- | ------------ |
+| **Max-draw is free** | There is little real downside to drawing to the bank cap every time. Meditate restores half the well for one ACTION and is **cheap enough relative to what you get** that emptying the well does not sting. Optimal play is “always fill, always dump.” |
+| **Turn-tax refill feels bad** | If we nerf Meditate (or otherwise make dry hurt), the player’s recovery is still “skip a whole turn.” That is a bad lever: either regen is soft and commitment is fake, or regen is hard and the player loses turns. Neither is fun. |
+| **Too many clicks** | A real cast is Draw × N, then the spell (and later maybe Meditate). That is busywork, not a decision. Extra buttons for the same burst every fight. |
+
+**Design trap:** the kit tries to make *commitment* matter by taxing *tempo* (extra Draw actions + full-turn Meditate). Tempo taxes either do not bite (regen too good) or feel punitive (skip turns / click tax). Rework should keep the finite-well fantasy without “fill the bank by mashing Draw” or “recover by sitting out.”
+
+The sections below describe the **current prototype** until the rework replaces them.
 
 ---
 
