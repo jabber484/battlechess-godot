@@ -1,28 +1,19 @@
 class_name WarlockManaShieldAbilityData
 extends AbilityData
 
-## Mana Shield — raise a full-block barrier by dumping the Draw bank.
+## Mana Shield — ward until one block or own next turn (expire). Charging → Used either way.
 ##
-## Slot: ACTION / CostSlot.NONE (free — does not spend move or action); self-cast (`activates_on_select`).
-## Cost: requires Draw bank ≥ `mana_cost`, then spends the **whole** bank.
-## Normal (spent ≤ `overload_threshold`): blocks **1** damaging hit fully (no HP carryover).
-## Overload (spent > threshold): blocks every damaging hit while up.
-## Expiry (whichever comes first for the active mode):
-## - Normal: after blocking 1 hit, OR when the Warlock's own turn starts
-## - Overload: after `overload_unit_turns` other units' turn starts, OR own turn start
-## UI: overhead SHIELD label + combat log on block / fade.
+## Slot: ACTION / CostSlot.NONE (free); self-cast (`activates_on_select`).
+## Open: lock `charge_draw_amount`; `blocks_available = 1`.
+## Own turn start (after Available regen): if still open, expire → commit Charging to Used.
+## Block: full nullify → commit Charging to Used → end channel.
+## Used clears on turn end (up to 10 per turn; hole fills on later regen).
 
-@export var mana_cost: int = 5
-@export var overload_threshold: int = 15
-@export var overload_unit_turns: int = 3
+@export var charge_draw_amount: int = 15
 
-var overload_unlocked: bool = false
-
-## Runtime shield state (raised by cast).
-var active: bool = false
-var charges: int = 0
-var remaining_unit_turns: int = 0
-var _duration_mode: bool = false
+var charged_mana: int = 0
+var is_charging: bool = false
+var blocks_available: int = 0
 
 
 func _init() -> void:
@@ -35,7 +26,11 @@ func _init() -> void:
 func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
 	if not super.can_activate(unit, ctx):
 		return false
-	return WarlockDrawBank.get_drawn(unit) >= mana_cost
+	if is_charging:
+		return false
+	if unit == null or not unit.has_resource(BattleEnums.UnitResource.MANA):
+		return false
+	return unit.get_resource(BattleEnums.UnitResource.MANA) >= charge_draw_amount
 
 
 func get_target_tiles(unit: Unit, _ctx: AbilityContext) -> Array[Vector2i]:
@@ -54,48 +49,65 @@ func activates_on_select() -> bool:
 	return true
 
 
-func on_draw_bank_changed(_unit: Unit, drawn: int) -> void:
-	if not overload_unlocked and drawn >= overload_threshold:
-		overload_unlocked = true
+func try_open_channel(unit: Unit) -> bool:
+	if is_charging or unit == null:
+		return false
+	if charge_draw_amount <= 0:
+		return false
+	if not unit.lock_resource(charge_draw_amount, BattleEnums.UnitResource.MANA):
+		return false
+	charged_mana = charge_draw_amount
+	is_charging = true
+	blocks_available = 1
+	if unit:
+		unit.notify_status_fx_changed()
+	return true
+
+
+func _end_channel_to_used(unit: Unit) -> int:
+	var amount := charged_mana
+	charged_mana = 0
+	is_charging = false
+	blocks_available = 0
+	if amount > 0 and unit:
+		unit.commit_resource_to_used(amount, BattleEnums.UnitResource.MANA)
+	if unit:
+		unit.notify_status_fx_changed()
+	return amount
+
+
+func purge_channel(unit: Unit = null) -> void:
+	if not is_charging:
+		return
+	_end_channel_to_used(unit)
 
 
 func on_incoming_damage(unit: Unit, context) -> void:
-	if not active or context == null:
+	if not is_charging or context == null:
+		return
+	if blocks_available < 1:
 		return
 	var final_damage: int = int(context.final_damage)
 	if final_damage <= 0:
 		return
 	context.final_damage = 0
+	var spent := _end_channel_to_used(unit)
 	if unit:
 		unit.emit_ability_log(
-			"%s's Mana Shield blocked %d damage" % [unit.display_name, final_damage]
+			"%s's Mana Shield blocked %d damage (%d mana → Used)"
+			% [unit.display_name, final_damage, spent]
 		)
-	if _duration_mode:
-		if unit:
-			unit.notify_status_fx_changed()
-		return
-	charges = maxi(0, charges - 1)
-	if charges <= 0:
-		_clear_shield(unit, "blocked")
-	elif unit:
-		unit.notify_status_fx_changed()
 
 
 func on_turn_started(unit: Unit) -> void:
-	# Own turn start always clears the shield (whichever-first with unit-turn countdown).
-	if active:
-		_clear_shield(unit, "own_turn")
-
-
-func on_foreign_turn_started(owner: Unit, starting_unit: Unit) -> void:
-	if not active or not _duration_mode:
+	# Runs after Available regen. Expire open ward so Charging locks into Used this turn.
+	if not is_charging:
 		return
-	remaining_unit_turns = maxi(0, remaining_unit_turns - 1)
-	if remaining_unit_turns <= 0:
-		var starter := starting_unit.display_name if starting_unit else "another unit"
-		_clear_shield(owner, "duration", starter)
-	elif owner:
-		owner.notify_status_fx_changed()
+	var spent := _end_channel_to_used(unit)
+	if unit and spent > 0:
+		unit.emit_ability_log(
+			"%s's Mana Shield expires (%d mana → Used)" % [unit.display_name, spent]
+		)
 
 
 func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> Dictionary:
@@ -108,99 +120,36 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 	if unit == null or not is_valid_target(unit, target_pos, ctx):
 		return empty
 
-	var provider := WarlockDrawBank.get_provider(unit)
-	if provider == null:
-		return empty
-
-	var spent_holder := {"spent": 0, "overload": false}
-
 	return {
 		"commit": func() -> bool:
-			if provider.drawn_mana < mana_cost:
-				return false
-			var spent: int = provider.spend_entire_bank()
-			spent_holder["spent"] = spent
-			spent_holder["overload"] = spent > overload_threshold
-			WarlockDrawBank.notify_bank_changed(unit)
-			_raise_shield(unit, bool(spent_holder["overload"]))
-			return true,
+			return try_open_channel(unit),
 		"present": Callable(),
 		"complete": Callable(),
 		"death_units": [],
 		"presentation": BattleEnums.Presentation.SELF_BUFF,
-		"spent_drawn": spent_holder,
-		"shield_overload": spent_holder,
+		"mana_shield_open": true,
 	}
 
 
 func is_shield_up() -> bool:
-	return active
+	return is_charging
 
 
 func get_shield_status_text() -> String:
-	if not active:
+	if not is_charging:
 		return ""
-	if _duration_mode:
-		return "SHIELD %d" % remaining_unit_turns
-	return "SHIELD"
+	if blocks_available > 0:
+		return "SHIELD"
+	return "SHIELD—"
 
 
 func get_tooltip_text() -> String:
-	var text := (
-		"Spend the entire Draw bank (min %d). Fully blocks one hit."
-		% mana_cost
-	)
-	if overload_unlocked:
-		text += (
-			"\nOverload (bank > %d): blocks every hit for up to %d unit turns, or until your next turn."
-			% [overload_threshold, overload_unit_turns]
+	if is_charging:
+		return (
+			"Ward open (%d Charging). Blocks one hit or expires on your next turn → Used."
+			% charged_mana
 		)
-	return text
-
-
-func _raise_shield(unit: Unit, overload: bool) -> void:
-	active = true
-	if overload:
-		_duration_mode = true
-		charges = 0
-		remaining_unit_turns = overload_unit_turns
-	else:
-		_duration_mode = false
-		charges = 1
-		remaining_unit_turns = 0
-	if unit:
-		unit.notify_status_fx_changed()
-
-
-func _clear_shield(
-	unit: Unit = null,
-	reason: String = "",
-	other_name: String = "",
-) -> void:
-	var was_active := active
-	var was_duration := _duration_mode
-	active = false
-	charges = 0
-	remaining_unit_turns = 0
-	_duration_mode = false
-	if not was_active:
-		return
-	if unit:
-		unit.notify_status_fx_changed()
-		match reason:
-			"blocked":
-				unit.emit_ability_log(
-					"%s's Mana Shield shattered (blocked one hit)" % unit.display_name
-				)
-			"duration":
-				unit.emit_ability_log(
-					"%s's Mana Shield faded (duration ended on %s's turn)"
-					% [unit.display_name, other_name if not other_name.is_empty() else "another unit"]
-				)
-			"own_turn":
-				var mode := "Overload" if was_duration else "Mana Shield"
-				unit.emit_ability_log(
-					"%s's %s faded (own turn began)" % [unit.display_name, mode]
-				)
-			_:
-				pass
+	return (
+		"Open Mana Shield (free). Locks %d Available→Charging. One block or next turn expire → Used."
+		% charge_draw_amount
+	)

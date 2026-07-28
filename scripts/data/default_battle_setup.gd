@@ -12,11 +12,9 @@ const WarriorBrawlAbilityDataScript := preload("res://scripts/abilities/warrior_
 const WarriorCounterAbilityDataScript := preload("res://scripts/abilities/warrior_counter_ability_data.gd")
 const WarriorStaminaShieldAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_shield_ability_data.gd")
 const WarriorStaminaRechargeAbilityDataScript := preload("res://scripts/abilities/warrior_stamina_recharge_ability_data.gd")
-const WarlockDrawManaAbilityDataScript := preload("res://scripts/abilities/warlock_draw_mana_ability_data.gd")
-const WarlockFistFightAbilityDataScript := preload("res://scripts/abilities/warlock_fist_fight_ability_data.gd")
 const WarlockManaShieldAbilityDataScript := preload("res://scripts/abilities/warlock_mana_shield_ability_data.gd")
 const WarlockChargedBoltAbilityDataScript := preload("res://scripts/abilities/warlock_charged_bolt_ability_data.gd")
-const WarlockMeditateAbilityDataScript := preload("res://scripts/abilities/warlock_meditate_ability_data.gd")
+const WarlockChargedBlastAbilityDataScript := preload("res://scripts/abilities/warlock_charged_blast_ability_data.gd")
 
 
 static func get_unit_spawns() -> Array[UnitSpawnData]:
@@ -126,10 +124,8 @@ static func _make_warlock_stats() -> UnitStatsData:
 	stats.max_resource = 50
 	var abilities: Array[AbilityData] = []
 	abilities.append(SimpleMoveAbilityDataScript.new())
-	abilities.append(WarlockDrawManaAbilityDataScript.new())
 	abilities.append(WarlockChargedBoltAbilityDataScript.new())
+	abilities.append(WarlockChargedBlastAbilityDataScript.new())
 	abilities.append(WarlockManaShieldAbilityDataScript.new())
-	abilities.append(WarlockMeditateAbilityDataScript.new())
-	abilities.append(WarlockFistFightAbilityDataScript.new())
 	stats.abilities = abilities
 	return stats

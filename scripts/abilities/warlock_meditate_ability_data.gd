@@ -1,10 +1,11 @@
 class_name WarlockMeditateAbilityData
 extends AbilityData
 
-## Meditate — spend the turn restoring half the mana well.
+## Meditate — restore half the mana well, purge all Warlock channels, end the turn.
 ##
-## Slot: ACTION / CostSlot.ACTION; self-cast, runs on ability-bar click (`activates_on_select`).
-## Effect: gain `floor(max_resource / 2)` mana (clamped to max), then **immediately end the turn**.
+## Slot: ACTION / CostSlot.ACTION; self-cast (`activates_on_select`).
+## Effect: purge every ability with `purge_channel`, gain `floor(max_resource / 2)` mana,
+## then **immediately end the turn**. Purged charge is not refunded.
 ## Gate: owns the action slot and well is not already full.
 
 @export var restore_fraction: float = 0.5
@@ -47,6 +48,14 @@ func _restore_amount(unit: Unit) -> int:
 	return int(floor(float(unit.max_resource) * restore_fraction))
 
 
+func _purge_all_channels(unit: Unit) -> void:
+	if unit == null:
+		return
+	for ability in unit.abilities:
+		if ability != null and ability.has_method("purge_channel"):
+			ability.purge_channel(unit)
+
+
 func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> Dictionary:
 	var empty := {
 		"commit": Callable(),
@@ -69,6 +78,7 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 				return false
 			if amount <= 0:
 				return false
+			_purge_all_channels(unit)
 			var before := unit.get_resource(BattleEnums.UnitResource.MANA)
 			unit.gain_resource(amount, BattleEnums.UnitResource.MANA)
 			gained_holder["amount"] = unit.get_resource(BattleEnums.UnitResource.MANA) - before
@@ -78,9 +88,9 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 			var gained: int = int(gained_holder["amount"])
 			if unit and gained > 0:
 				unit.emit_ability_log(
-					"%s meditates (+%d mana) — turn ends" % [unit.display_name, gained]
+					"%s meditates (+%d mana, channels purged) — turn ends"
+					% [unit.display_name, gained]
 				)
-			# Defer so ActionRunner can clear busy before the next unit's turn begins.
 			if turn_manager:
 				turn_manager.call_deferred("finish_turn", unit),
 		"death_units": [],
@@ -91,5 +101,5 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 
 func get_tooltip_text() -> String:
 	return (
-		"Restore half your max mana, then immediately end your turn."
+		"Restore half your max mana, purge all charged spells, then end your turn."
 	)

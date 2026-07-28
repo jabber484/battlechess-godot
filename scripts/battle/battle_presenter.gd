@@ -59,8 +59,6 @@ func enhance_execution(
 			_enhance_attack(unit, execution)
 		BattleEnums.Presentation.BRAWL:
 			_enhance_brawl(unit, execution)
-		BattleEnums.Presentation.DRAW:
-			_enhance_draw(unit, execution)
 		BattleEnums.Presentation.SELF_BUFF:
 			_enhance_self_buff(unit, execution)
 	return execution
@@ -230,49 +228,22 @@ func _enhance_brawl(unit: Unit, execution: Dictionary) -> void:
 			)
 
 
-func _enhance_draw(unit: Unit, execution: Dictionary) -> void:
-	var amount := int(execution.get("draw_amount", 0))
-	execution["present"] = func() -> void:
-		focus_grid_pos(unit.grid_pos)
-		await _host.get_tree().create_timer(0.18).timeout
-	if _battle_ui:
-		var prior_complete: Callable = execution.get("complete", Callable())
-		execution["complete"] = func() -> void:
-			if prior_complete.is_valid():
-				prior_complete.call()
-			var bank: int = WarlockDrawBank.get_drawn(unit)
-			_battle_ui.append_log(
-				"%s draws %d mana (bank %d)" % [unit.display_name, amount, bank],
-				_log_color_for(unit),
-			)
-
-
 func _enhance_self_buff(unit: Unit, execution: Dictionary) -> void:
 	execution["present"] = func() -> void:
 		focus_grid_pos(unit.grid_pos)
 		await _host.get_tree().create_timer(0.45).timeout
-	# Mana Shield sets spent_drawn; other SELF_BUFF abilities (e.g. Meditate) log themselves.
-	var spent_holder: Variant = execution.get("spent_drawn", null)
-	if typeof(spent_holder) != TYPE_DICTIONARY:
+	# Channel opens log via emit_ability_log or complete callbacks.
+	if execution.get("channel_open", false) or execution.get("mana_shield_open", false):
+		if _battle_ui and execution.get("mana_shield_open", false):
+			var prior_complete: Callable = execution.get("complete", Callable())
+			execution["complete"] = func() -> void:
+				if prior_complete.is_valid():
+					prior_complete.call()
+				_battle_ui.append_log(
+					"%s raises Mana Shield" % unit.display_name,
+					_log_color_for(unit),
+				)
 		return
-	if _battle_ui:
-		var prior_complete: Callable = execution.get("complete", Callable())
-		execution["complete"] = func() -> void:
-			if prior_complete.is_valid():
-				prior_complete.call()
-			var spent := int(spent_holder.get("spent", 0))
-			var overload := bool(spent_holder.get("overload", false))
-			var mode := "Overload" if overload else "raised"
-			var detail := "up to 3 unit turns / until own turn"
-			if not overload:
-				var block_charges: int = int(spent_holder.get("charges", 0))
-				if block_charges <= 0:
-					block_charges = maxi(1, floori(spent / 5.0))
-				detail = "blocks %d hit%s" % [block_charges, "" if block_charges == 1 else "s"]
-			_battle_ui.append_log(
-				"%s %s Mana Shield (%s, spent %d)" % [unit.display_name, mode, detail, spent],
-				_log_color_for(unit),
-			)
 
 
 func _tween_along_path(unit: Unit, path: Array[Vector2i]) -> void:

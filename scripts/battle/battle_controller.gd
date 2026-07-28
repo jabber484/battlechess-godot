@@ -112,11 +112,13 @@ func _on_turn_started(unit: Unit) -> void:
 
 func _on_turn_ended(unit: Unit) -> void:
 	if unit:
+		unit.notify_turn_ended()
 		battle_ui.append_log("%s ended turn" % unit.display_name, _log_color_for(unit))
 	_selected_ability = null
 	_hovered_ability = null
 	_pending_attack_target = null
 	_hovered_tile = Vector2i(-1, -1)
+	_clear_resource_spend_preview()
 	battle_ui.clear_abilities()
 	grid_view.clear_highlights()
 	battle_ui.set_hit_chance("")
@@ -163,9 +165,10 @@ func _on_unit_ability_log(unit: Unit, message: String) -> void:
 
 func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int, hit_chance: int) -> void:
 	var verb := "shoots"
-	if _selected_ability != null and _selected_ability.id == &"warlock_fist_fight":
-		verb = "fist-fights"
-	elif _selected_ability != null and _selected_ability.id == &"warlock_charged_bolt":
+	if (
+		_selected_ability != null
+		and _selected_ability is WarlockChargedBoltAbilityData
+	):
 		verb = "blasts"
 	var msg := "%s %s %s (%d%%): " % [attacker.display_name, verb, defender.display_name, hit_chance]
 	if hit:
@@ -224,6 +227,7 @@ func _on_ability_selected(ability: AbilityData) -> void:
 		_pending_attack_target = null
 		battle_ui.set_hit_chance("")
 		battle_ui.set_selected_ability(null)
+		_clear_resource_spend_preview()
 		grid_view.clear_highlights()
 		await _execute_ability(ability, active, active.grid_pos)
 		return
@@ -233,12 +237,24 @@ func _on_ability_selected(ability: AbilityData) -> void:
 	_pending_attack_target = null
 	battle_ui.set_hit_chance("")
 	battle_ui.set_selected_ability(_selected_ability)
+	_clear_resource_spend_preview()
 	_refresh_highlights()
 	match ability.category:
 		BattleEnums.AbilityCategory.MOVE:
 			battle_ui.set_status("Selected %s — click a highlighted tile" % ability.display_name)
 		BattleEnums.AbilityCategory.ACTION:
-			battle_ui.set_status("Selected %s — click a target" % ability.display_name)
+			if ability is WarlockChargedBoltAbilityData:
+				var bolt := ability as WarlockChargedBoltAbilityData
+				if bolt.is_charging:
+					battle_ui.set_status(
+						"Selected %s — click an enemy in range" % bolt.display_name
+					)
+				else:
+					battle_ui.set_status(
+						"Selected %s — click self to channel (range shown)" % bolt.display_name
+					)
+			else:
+				battle_ui.set_status("Selected %s — click a target" % ability.display_name)
 		_:
 			battle_ui.set_status("Selected %s" % ability.display_name)
 
@@ -251,6 +267,7 @@ func _on_ability_hovered(ability: AbilityData) -> void:
 		return
 	_hovered_ability = ability
 	_refresh_highlights()
+	_update_resource_spend_preview(active, ability)
 
 
 func _on_ability_unhovered(ability: AbilityData) -> void:
@@ -258,6 +275,44 @@ func _on_ability_unhovered(ability: AbilityData) -> void:
 		return
 	_hovered_ability = null
 	_refresh_highlights()
+	_clear_resource_spend_preview()
+
+
+func _update_resource_spend_preview(unit: Unit, ability: AbilityData) -> void:
+	if unit == null:
+		return
+	var hud: UnitHUD = unit.get_unit_hud()
+	if hud == null:
+		return
+	var lock := 0
+	var commit := 0
+	var spend := 0
+	if ability is WarlockChargedBoltAbilityData:
+		var bolt := ability as WarlockChargedBoltAbilityData
+		if bolt.is_charging:
+			commit = bolt.charged_mana
+		else:
+			lock = bolt.charge_draw_amount
+	elif ability is WarlockManaShieldAbilityData:
+		var shield := ability as WarlockManaShieldAbilityData
+		if not shield.is_charging:
+			lock = shield.charge_draw_amount
+	elif ability is WarriorBasicAttackAbilityData:
+		spend = (ability as WarriorBasicAttackAbilityData).stamina_cost
+	elif ability is WarriorBrawlAbilityData:
+		spend = (ability as WarriorBrawlAbilityData).stamina_cost
+	elif ability is WarriorCounterAbilityData:
+		spend = (ability as WarriorCounterAbilityData).stamina_cost
+	hud.set_resource_spend_preview(lock, commit, spend)
+
+
+func _clear_resource_spend_preview() -> void:
+	var active := turn_manager.active_unit
+	if active == null:
+		return
+	var hud: UnitHUD = active.get_unit_hud()
+	if hud:
+		hud.clear_resource_spend_preview()
 
 
 func _on_tile_picked(grid_pos: Vector2i) -> void:
@@ -277,8 +332,9 @@ func _on_tile_picked(grid_pos: Vector2i) -> void:
 	if _selected_ability.category == BattleEnums.AbilityCategory.ACTION:
 		var occupant := grid_system.get_occupant(grid_pos)
 		if occupant and occupant.is_enemy():
-			await _handle_attack_click(active, occupant)
-			return
+			if _selected_ability.is_valid_target(active, grid_pos, _ability_ctx):
+				await _handle_attack_click(active, occupant)
+				return
 
 	if not _selected_ability.is_valid_target(active, grid_pos, _ability_ctx):
 		_pending_attack_target = null
@@ -368,13 +424,15 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 	if unit.is_player() and not battle_state.is_over():
 		if turn_manager.active_unit != unit:
 			return
-		if ability.id == &"warlock_draw_mana":
-			var bank: int = WarlockDrawBank.get_drawn(unit)
-			var max_bank: int = WarlockDrawBank.get_max_drawn(unit)
-			if ability.can_activate(unit, _ability_ctx):
-				battle_ui.set_status("Bank %d/%d — Draw again or choose a cast" % [bank, max_bank])
+		if ability is WarlockChargedBoltAbilityData:
+			var bolt := ability as WarlockChargedBoltAbilityData
+			if bolt and bolt.is_charging:
+				battle_ui.set_status(
+					"%s charged %d/%d — fire at an enemy or End Turn"
+					% [bolt.display_name, bolt.charged_mana, bolt.max_charged_mana()]
+				)
 			else:
-				battle_ui.set_status("Bank %d/%d — choose a cast, move, or End Turn" % [bank, max_bank])
+				battle_ui.set_status("Select an ability, or End Turn")
 		elif ability.id == &"warlock_mana_shield":
 			var shield := unit.get_mana_shield()
 			if shield and shield.is_shield_up():
@@ -402,13 +460,6 @@ func _player_abilities(unit: Unit) -> Array[AbilityData]:
 			continue
 		if ability.category == BattleEnums.AbilityCategory.PASSIVE:
 			continue
-		# Fist Fight is dry-only — omit from the bar while any mana remains.
-		if ability is WarlockFistFightAbilityData:
-			if (
-				not unit.has_resource(BattleEnums.UnitResource.MANA)
-				or unit.get_resource(BattleEnums.UnitResource.MANA) > 0
-			):
-				continue
 		result.append(ability)
 	return result
 
@@ -512,7 +563,22 @@ func _refresh_highlights() -> void:
 
 
 func _show_action_ability_highlights(unit: Unit, ability: AbilityData) -> void:
-	if ability.activates_on_select() or ability.id == &"warlock_mana_shield" or ability.id == &"warlock_draw_mana":
+	if ability is WarlockChargedBoltAbilityData:
+		var bolt := ability as WarlockChargedBoltAbilityData
+		var bolt_range := _attack_range_tiles(unit, ability)
+		if not bolt_range.is_empty():
+			grid_view.show_range(bolt_range)
+		if not bolt.is_charging:
+			grid_view.show_self_target(ability.get_target_tiles(unit, _ability_ctx))
+			battle_ui.set_hit_chance("")
+			return
+		var bolt_targets := ability.get_target_tiles(unit, _ability_ctx)
+		if not bolt_targets.is_empty():
+			grid_view.show_attackable(bolt_targets)
+		if bolt_targets.is_empty() and bolt_range.is_empty():
+			battle_ui.set_hit_chance("")
+		return
+	if ability.activates_on_select() or ability.id == &"warlock_mana_shield":
 		grid_view.show_self_target(ability.get_target_tiles(unit, _ability_ctx))
 		battle_ui.set_hit_chance("")
 		return
@@ -564,22 +630,15 @@ func _refresh_attack_hover_preview(unit: Unit) -> void:
 
 
 func _hit_chance_text(attacker: Unit, defender: Unit, ability: AbilityData) -> String:
-	if ability is WarlockFistFightAbilityData:
-		var flat: int = (ability as WarlockFistFightAbilityData).flat_hit_chance
-		return "Hit %d%%: flat Fist Fight miss chance" % flat
 	var breakdown := combat_system.explain_hit_chance(
 		attacker, defender, _distance_penalty_per_tile(ability), _range_metric(ability)
 	)
 	var text := combat_system.format_hit_chance(breakdown)
 	if ability is WarlockChargedBoltAbilityData:
-		var bank: int = WarlockDrawBank.get_drawn(attacker)
 		var bolt: WarlockChargedBoltAbilityData = ability as WarlockChargedBoltAbilityData
-		var preview: int = int(floor(float(bank) * bolt.damage_per_mana))
-		if bank > bolt.overload_threshold:
-			preview = int(floor(float(preview) * bolt.overload_damage_mult))
-			text += " | dmg ~%d (Overload)" % preview
-		else:
-			text += " | dmg ~%d" % preview
+		var ticks: int = bolt.charge_ticks()
+		var preview: int = bolt.base_bolt_damage * maxi(1, ticks)
+		text += " | dmg ~%d (%d×)" % [preview, maxi(1, ticks)]
 	return text
 
 

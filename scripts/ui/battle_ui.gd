@@ -63,13 +63,27 @@ func set_active_unit(unit: Unit) -> void:
 	var resource_txt := ""
 	if unit.has_resource():
 		var res_name := _resource_label(unit.resource_id)
-		resource_txt = "  %s %d/%d" % [res_name, unit.current_resource, unit.max_resource]
-	var bank := WarlockDrawBank.get_provider(unit)
-	var bank_txt := ""
-	if bank:
-		bank_txt = "  Bank %d/%d" % [bank.drawn_mana, bank.max_drawn_mana]
-	active_label.text = "Active: %s  HP %d/%d  Sp %d%s%s" % [
-		unit.display_name, unit.current_hp, unit.max_hp, unit.speed, resource_txt, bank_txt
+		if unit.resource_id == BattleEnums.UnitResource.MANA:
+			var used := unit.get_resource_used()
+			if used > 0:
+				resource_txt = "  %s %d + %d / %d (Used %d)" % [
+					res_name,
+					unit.current_resource,
+					unit.get_resource_charging(),
+					unit.get_resource_effective_max(),
+					used,
+				]
+			else:
+				resource_txt = "  %s %d + %d / %d" % [
+					res_name,
+					unit.current_resource,
+					unit.get_resource_charging(),
+					unit.get_resource_effective_max(),
+				]
+		else:
+			resource_txt = "  %s %d/%d" % [res_name, unit.current_resource, unit.max_resource]
+	active_label.text = "Active: %s  HP %d/%d  Sp %d%s" % [
+		unit.display_name, unit.current_hp, unit.max_hp, unit.speed, resource_txt
 	]
 	_refresh_flags(unit)
 
@@ -143,9 +157,16 @@ func set_abilities(
 			continue
 		var button := Button.new()
 		button.text = ability.display_name
-		if ability is WarlockDrawManaAbilityData:
-			var draw: WarlockDrawManaAbilityData = ability as WarlockDrawManaAbilityData
-			button.text = "Draw (%d/%d)" % [draw.drawn_mana, draw.max_drawn_mana]
+		if ability is WarlockChargedBoltAbilityData:
+			var bolt: WarlockChargedBoltAbilityData = ability as WarlockChargedBoltAbilityData
+			var short := "Blast" if ability.id == &"warlock_charged_blast" else "Bolt"
+			button.text = "%s (%d/%d)" % [short, bolt.charged_mana, bolt.max_charged_mana()]
+		elif ability is WarlockManaShieldAbilityData:
+			var shield: WarlockManaShieldAbilityData = ability as WarlockManaShieldAbilityData
+			if shield.is_charging:
+				button.text = "Shield" if shield.blocks_available > 0 else "Shield—"
+			else:
+				button.text = "Mana Shield"
 		button.custom_minimum_size = Vector2(120, 36)
 		var can_use := bool(is_activatable.call(ability))
 		# Keep mouse events for range preview even when the ability can't be used yet.
@@ -154,8 +175,6 @@ func set_abilities(
 		button.set_meta("can_use", can_use)
 		if ability.has_method("get_tooltip_text"):
 			button.tooltip_text = str(ability.get_tooltip_text())
-		elif ability is WarlockDrawManaAbilityData:
-			button.tooltip_text = "Pull mana from the well into the Draw bank (free)."
 		button.pressed.connect(_on_ability_button_pressed.bind(ability))
 		button.mouse_entered.connect(_on_ability_button_hovered.bind(ability))
 		button.mouse_exited.connect(_on_ability_button_unhovered.bind(ability))

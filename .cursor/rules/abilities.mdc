@@ -17,7 +17,7 @@ alwaysApply: false
 
 - Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION` | `PASSIVE`), `cost_slot` (`MOVE` → `notify_moved` with path cost / remaining movement points, `ACTION` → `notify_acted`, `NONE` for passives)
 - Methods: `can_activate(unit, ctx)`, `get_target_tiles(unit, ctx)`, `is_valid_target(unit, target_pos, ctx)`, `build_execution(unit, target_pos, ctx) -> Dictionary` (`commit` / `present` / `complete` / `death_units`)
-- Optional: `activates_on_select()` — if true, ability bar click runs immediately on self (no tile confirm); used by Warlock Draw and Mana Shield
+- Optional: `activates_on_select()` — if true, ability bar click runs immediately on self (no tile confirm); used by Warlock Mana Shield
 - Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` and/or `on_turn_started(unit)` when needed. `Unit.modify_incoming_damage` dispatches `on_incoming_damage` to **all** abilities (PASSIVE soak kits and ACTION abilities with raised block state). `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities. `Unit.notify_foreign_turn_started` dispatches `on_foreign_turn_started` when a different unit’s turn begins (duration countdowns).
 - Use `AbilityContext` for system refs (`pathfinding`, `grid_system`, `turn_manager`, `battle_state`, `combat_system`). Abilities must not cache Node paths.
 - Execution may include intent for presentation: `presentation` (`BattleEnums.Presentation`), plus `path` / `defender`. Leave `present` empty so `BattlePresenter` fills camera/tweens. Do not reference `CameraRig` from abilities.
@@ -51,7 +51,7 @@ Movement path cost is separate (octile √2 steps) — see `grid.mdc`. Do not co
 **Defaults & current kit**
 
 - `SimpleAttackAbilityData` / Charged Bolt → `EUCLIDEAN`
-- Warrior Melee / Brawl / Fist Fight → set `range_metric = CHEBYSHEV` in `_init`
+- Warrior Melee / Brawl → set `range_metric = CHEBYSHEV` in `_init`
 
 **How to use (ability code)**
 
@@ -97,12 +97,10 @@ Standard abilities:
 - Warrior Counter: `WarriorCounterAbilityData` (`id = &"warrior_counter"`) — ACTION; spend stamina, end turn; fully block next hit from an adjacent attacker; riposte if still adjacent; farther hits do not consume it; clears unused on own turn start
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
-- Warlock Draw: `WarlockDrawManaAbilityData` (`id = &"warlock_draw_mana"`) — free action (`NONE`); well → Draw bank (`drawn_mana`, cap 20)
-- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — dumps Draw bank; `EUCLIDEAN` range; damage scales with spent; Overload = 150% damage
-- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — free action (`NONE`); dumps Draw bank; normal charges = `floor(spent / mana_cost)` full blocks; Overload = up to 3 unit turns
-- Warlock Meditate: `WarlockMeditateAbilityData` (`id = &"warlock_meditate"`) — ACTION; restore half max mana, then immediately end the turn
-- Warlock Fist Fight: `WarlockFistFightAbilityData` (`id = &"warlock_fist_fight"`) — dry melee, `CHEBYSHEV` range 1, flat 50% hit chance
-- Draw bank resolution: `WarlockDrawBank.get_provider(unit)` — casts never hard-code a bank ability id forever
+- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — lock Available→Charging on open/sip (self-click + range ring); fire commits Charging→Used (`EUCLIDEAN` range 4); cost 10/tick; max 2 ticks → 2× `base_bolt_damage` (10)
+- Warlock Charged Blast: `WarlockChargedBlastAbilityData` (`id = &"warlock_charged_blast"`) — same channel flow; `CHEBYSHEV` range 2; cost 15/tick; base damage 18
+- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — free (`NONE`); lock on open; 1 block or own-turn expire → Charging→Used
+- Warlock mana turn start (`Unit`, `resource_id == MANA`): regen Available into free capacity (Used still blocks) → ability hooks; **turn end** releases up to **10** Used
 - `CostSlot.NONE`: free abilities (no movement/action budget); `can_activate` still requires owning the turn
 - `CostSlot.MOVE`: gated by `unit.can_move_more()` (remaining movement ≥ one cardinal step); complete via `notify_moved(unit, path_cost)`. Warrior Move may also activate on stamina extension when free move is exhausted
 - `CombatSystem.commit_attack(..., require_action, require_own_turn, damage_override, hit_chance_override, range_metric)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation; overrides for ability-scaled damage / flat miss; always pass the ability’s `range_metric`

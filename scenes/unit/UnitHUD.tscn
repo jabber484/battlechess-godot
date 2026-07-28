@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/units/unit_hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://scripts/units/resource_stack_bar.gd" id="2_bar"]
 
 [node name="UnitHUD" type="Node3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
@@ -54,13 +55,12 @@ max_value = 100.0
 value = 100.0
 show_percentage = false
 
-[node name="ResourceBar" type="ProgressBar" parent="SubViewport/Root/VBox"]
+[node name="ResourceBar" type="Control" parent="SubViewport/Root/VBox"]
 visible = false
 custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
-max_value = 50.0
-value = 50.0
-show_percentage = false
+size_flags_horizontal = 3
+script = ExtResource("2_bar")
 
 [node name="Sprite3D" type="Sprite3D" parent="."]
 billboard = 1

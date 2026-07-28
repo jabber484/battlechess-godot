@@ -30,7 +30,12 @@ signal incoming_damage(context)
 
 var grid_pos: Vector2i = Vector2i.ZERO
 var current_hp: int = 100
+## Available resource (mana/stamina/…). For mana kits, Charging/Used are separate partitions.
 var current_resource: int = 0
+var resource_charging: int = 0
+var resource_used: int = 0
+## How much Used mana clears each turn end (mana kits).
+const MANA_USED_RELEASE_PER_TURN: int = 10
 var movement_remaining: float = 4.0
 var actions_used: int = 0
 var death_processed: bool = false
@@ -43,6 +48,8 @@ var abilities: Array[AbilityData] = []
 func _ready() -> void:
 	current_hp = max_hp
 	current_resource = max_resource if has_resource() else 0
+	resource_charging = 0
+	resource_used = 0
 	movement_remaining = float(move_range)
 	_apply_team_color()
 	_update_world_position()
@@ -77,6 +84,8 @@ func setup(p_team: BattleEnums.Team, p_pos: Vector2i, stats: Dictionary = {}) ->
 				abilities.append((ability as AbilityData).duplicate(true) as AbilityData)
 	current_hp = max_hp
 	current_resource = max_resource if has_resource() else 0
+	resource_charging = 0
+	resource_used = 0
 	movement_remaining = float(move_range)
 	_apply_team_color()
 	_update_world_position()
@@ -170,10 +179,30 @@ func get_resource(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) 
 	return current_resource if has_resource(id) else 0
 
 
-func get_resource_space(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> int:
+func get_resource_charging() -> int:
+	return resource_charging if has_resource() else 0
+
+
+func get_resource_used() -> int:
+	return resource_used if has_resource() else 0
+
+
+## Free slots under max not held in Available, Charging, or Used.
+func get_resource_free_capacity(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> int:
 	if not has_resource(id):
 		return 0
-	return maxi(0, max_resource - current_resource)
+	return maxi(0, max_resource - current_resource - resource_charging - resource_used)
+
+
+## Ceiling shown in UI: max minus Used timeout.
+func get_resource_effective_max() -> int:
+	if not has_resource():
+		return 0
+	return maxi(0, max_resource - resource_used)
+
+
+func get_resource_space(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> int:
+	return get_resource_free_capacity(id)
 
 
 func spend_resource(
@@ -185,8 +214,79 @@ func spend_resource(
 	if not has_resource(id) or current_resource < amount:
 		return false
 	current_resource -= amount
-	resource_changed.emit(self, resource_id, current_resource, max_resource)
+	_emit_resource_changed()
 	return true
+
+
+## Available → Charging (channel lock).
+func lock_resource(
+	amount: int,
+	id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE,
+) -> bool:
+	if amount <= 0:
+		return has_resource(id)
+	if not has_resource(id) or current_resource < amount:
+		return false
+	current_resource -= amount
+	resource_charging += amount
+	_emit_resource_changed()
+	return true
+
+
+## Charging → Used (fire / block / expire). Ability amount is authoritative.
+func commit_resource_to_used(
+	amount: int,
+	id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE,
+) -> bool:
+	if amount <= 0:
+		return has_resource(id)
+	if not has_resource(id):
+		return false
+	resource_charging = maxi(0, resource_charging - amount)
+	resource_used += amount
+	_emit_resource_changed()
+	return true
+
+
+## Drop Charging without refunding Available or parking in Used (rare reset paths).
+func discard_resource_charging(
+	amount: int,
+	id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE,
+) -> void:
+	if amount <= 0 or not has_resource(id):
+		return
+	var dropped := mini(amount, resource_charging)
+	if dropped <= 0:
+		return
+	resource_charging -= dropped
+	_emit_resource_changed()
+
+
+func release_used_resource(
+	id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE,
+	amount: int = -1,
+) -> int:
+	if not has_resource(id) or resource_used <= 0:
+		return 0
+	var release_cap := amount if amount >= 0 else MANA_USED_RELEASE_PER_TURN
+	var released := mini(resource_used, release_cap)
+	if released <= 0:
+		return 0
+	resource_used -= released
+	_emit_resource_changed()
+	return released
+
+
+## Fill Available into current free capacity (does not touch Charging/Used).
+func regen_resource_to_capacity(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> int:
+	if not has_resource(id):
+		return 0
+	var free := get_resource_free_capacity(id)
+	if free <= 0:
+		return 0
+	current_resource += free
+	_emit_resource_changed()
+	return free
 
 
 func gain_resource(
@@ -195,20 +295,23 @@ func gain_resource(
 ) -> int:
 	if amount <= 0 or not has_resource(id):
 		return 0
-	var before := current_resource
-	current_resource = mini(max_resource, current_resource + amount)
-	var gained := current_resource - before
-	if gained > 0:
-		resource_changed.emit(self, resource_id, current_resource, max_resource)
-	return gained
+	var space := get_resource_free_capacity(id)
+	if space <= 0:
+		return 0
+	var add := mini(amount, space)
+	current_resource += add
+	if add > 0:
+		_emit_resource_changed()
+	return add
 
 
 func refill_resource(id: BattleEnums.UnitResource = BattleEnums.UnitResource.NONE) -> void:
 	if not has_resource(id):
 		return
-	if current_resource == max_resource:
-		return
-	current_resource = max_resource
+	regen_resource_to_capacity(id)
+
+
+func _emit_resource_changed() -> void:
 	resource_changed.emit(self, resource_id, current_resource, max_resource)
 
 
@@ -248,11 +351,21 @@ func modify_incoming_damage(context) -> void:
 
 
 func notify_turn_started() -> void:
+	# Mana kits: fill Available into free capacity first (Used still blocks).
+	# Channel hooks run next — Shield expire / Bolt sip. Used releases gradually on turn end.
+	if resource_id == BattleEnums.UnitResource.MANA:
+		regen_resource_to_capacity()
 	for ability in abilities:
 		if ability == null:
 			continue
-		# Passives (recharge, etc.) and ACTION kits with per-turn state (e.g. Brawl).
+		# Passives (recharge, etc.) and ACTION kits with per-turn state (e.g. Brawl / channels).
 		ability.on_turn_started(self)
+
+
+## Call when this unit's turn ends — release up to MANA_USED_RELEASE_PER_TURN from Used.
+func notify_turn_ended() -> void:
+	if resource_id == BattleEnums.UnitResource.MANA:
+		release_used_resource()
 
 
 func notify_foreign_turn_started(starting_unit: Unit) -> void:
@@ -277,6 +390,10 @@ func notify_attacked(
 
 func notify_status_fx_changed() -> void:
 	status_fx_changed.emit(self)
+
+
+func get_unit_hud() -> UnitHUD:
+	return _hud as UnitHUD
 
 
 func emit_ability_log(message: String) -> void:
