@@ -10,24 +10,24 @@ Contrast: [Warrior](warrior.md) regenerates stamina every turn into one bar. War
 
 ## Why older designs failed
 
-The Draw → shared bank → cast loop and turn-tax Meditate collapsed in play (always max-draw, click tax, or skip-turn refill). Per-spell channels fixed the clicks; **three-gauge + regen-before-release** replaces Meditate with a sustainable prep loop. Large (÷10) mana magnitudes made cost = release and hid scarcity — kit now uses small integers with a free Bolt snap only.
+The Draw → shared bank → cast loop and turn-tax Meditate collapsed in play (always max-draw, click tax, or skip-turn refill). Per-spell channels fixed the clicks; **three-gauge + regen-before-release** replaces Meditate with a sustainable prep loop. Large (÷10) mana magnitudes made cost = release and hid scarcity — kit now uses small integers and keeps Bolt tick costs explicit.
 
 ---
 
 ## Fantasy & job
 
-Open a spell to lock mana into that channel. **Snap Bolt** opens for free (0 lock) and can fire same turn. Leave Bolt humming for a paid second tick (**2×** damage) or hold Shield (one block per turn). When you fire a paid channel — or Shield **blocks / expires** — that channel’s Charging moves to **Used** (timeout). Next turn: Available fills empty capacity first; Used clears gradually on turn end. After spending a channel, open the next one from remaining Available.
+Open a spell to lock mana into that channel. **Snap Bolt** can fire same turn (it locks 1 mana). Leave Bolt humming for a paid second tick (**2×** damage) or hold Shield (one block per turn). When you fire a paid channel — or Shield **blocks / expires** — that channel’s Charging moves to **Used** (timeout). Next turn: Available fills empty capacity first; Used clears gradually on turn end. After spending a channel, open the next one from remaining Available.
 
 
 | Pillar | Intent |
 | ------ | ------ |
 | Three gauges | Available + Charging + Used under one max |
-| Open = lock | Available → Charging on that spell (Bolt first tick may lock 0) |
+| Open = lock | Available → Charging on that spell (Bolt first tick locks 1) |
 | Fire / block / expire | Charging → Used; channel ends |
 | Turn start | Regen Available into free capacity (Used still blocks), **then** channel hooks |
 | Turn end | Release up to **1** Used per turn |
 | Prep pipeline | Fire → open next channel same turn if you can |
-| Free snap only | Bolt tick 1 costs 0; charged sip / Blast / Shield cost mana |
+| No free snap | Bolt tick 1 costs 1; sip tick 2 costs 1; Blast / Shield cost mana |
 | No Meditate | Sustain from regen pipeline (no turn-tax refill) |
 | No Draw / no Overload | Per-spell channels only |
 
@@ -38,10 +38,10 @@ Open a spell to lock mana into that channel. **Snap Bolt** opens for free (0 loc
 | Advantage | Why it matters |
 | --------- | -------------- |
 | High reach | Mid-range glass cannon |
-| Prep or snap | Free snap AA, or wait for paid double |
+| Prep or snap | Paid snap AA, or wait for paid double |
 | Scalable bolt | Second tick doubles damage |
 | Sustained ward | One block per turn while Shield is up |
-| Sustainable snap | Used times out; free snap needs no bank |
+| Sustainable snap | Used release matches snap spend; charged double leaves hangover |
 
 
 ### Baseline disadvantages
@@ -83,7 +83,7 @@ UnitStats
 
 ```
 available  = current_resource
-charging   = resource_charging   # mirror of open channels (0 while free Bolt snap is open)
+charging   = resource_charging   # mirror of open channels
 used       = resource_used
 free       = max − available − charging − used
 ```
@@ -129,7 +129,7 @@ Flow:
 
 | Event | Effect |
 | ----- | ------ |
-| Open Charged Bolt | Lock **0** (free snap tick); channel open |
+| Open Charged Bolt | Lock **1**; channel open |
 | Open Charged Blast | Available −**2** → Charging |
 | Open Mana Shield | Available −**2** → Charging |
 | Bolt turn sip | Lock **1** if Available allows (second tick) |
@@ -142,7 +142,7 @@ Flow:
 
 ### Soft caps & feel
 
-- Bolt cap **2 ticks** (max **1** mana on bolt channel: 0 + 1). Snap fire commits **0** Used (infinite AA). Charged fire commits **1** Used vs release **1** (sustainable double if you always prep).  
+- Bolt cap **2 ticks** (max **2** mana on bolt channel: 1 + 1). Snap fire commits **1** Used vs release **1** (sustainable 1-tick). Charged fire commits **2** Used vs release **1** (hangover; paid double).  
 - Blast cap **2 ticks** (max **3** mana on blast channel: 2 + 1).  
 - Shield: open until **one block** or **own next turn expire**; either way Charging → Used.  
 - After paid fire/block/expire, Used stays locked; **1** clears per turn end.  
@@ -158,11 +158,11 @@ Shared move. Octile path costs. MOVE slot.
 
 ### Charged Bolt — `warlock_charged_bolt`
 
-Open (free slot): range ring → click **self** → lock **0** (tick 1).  
+Open (slot): range ring → click **self** → lock **1** (tick 1).  
 Fire (ACTION): click enemy → commit charge to Used; damage `base_damage × ticks` (1 or 2).  
 Turn sip: second tick if under cap (+**1**).  
 Range **4** Euclidean. Base damage **10**.  
-Exports: `first_tick_lock = 0`, `next_tick_lock = 1`.
+Exports: `first_tick_lock = 1`, `next_tick_lock = 1`.
 
 ### Charged Blast — `warlock_charged_blast`
 
@@ -188,7 +188,7 @@ Typical loop: move → open Bolt (snap or hold for sip) and/or Shield → fire �
 
 ## Player & AI notes
 
-- UI: `A + C / (max − U)`; Bolt / Blast charge on buttons; Shield status. Free snap shows `0/2` mana while channel is open.  
+- UI: `A + C / (max − U)`; Bolt / Blast charge on buttons; Shield status. Bolt shows `1/2` mana while channel is open.  
 - AI: fire 2-tick channels when bank allows; snap otherwise; reopen after spend.
 
 ---
@@ -215,7 +215,7 @@ Typical loop: move → open Bolt (snap or hold for sip) and/or Shield → fire �
 | ---- | -------- |
 | `max_resource` | 5 |
 | `MANA_USED_RELEASE_PER_TURN` | 1 |
-| Bolt `first_tick_lock` | 0 |
+| Bolt `first_tick_lock` | 1 |
 | Bolt `next_tick_lock` | 1 |
 | Blast `first_tick_lock` / `next_tick_lock` | 2 / 1 |
 | Shield `charge_draw_amount` | 2 |
@@ -240,7 +240,7 @@ Typical loop: move → open Bolt (snap or hold for sip) and/or Shield → fire �
 - [x] Open/sip locks; fire/block commits to Used and ends channel  
 - [x] Turn start: regen free capacity → channel hooks; turn end: release Used  
 - [x] No Meditate in kit  
-- [x] Bolt free snap + paid 2-tick 2×; Shield 1 block/turn until block ends channel  
+- [x] Bolt 1-tick snap + paid 2-tick 2×; Shield 1 block/turn until block ends channel
 - [x] No Fist Fight in kit  
 - [ ] Tuned encounter readability  
 - [ ] AI (optional)  

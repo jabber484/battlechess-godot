@@ -161,5 +161,3 @@ alignment = 1
 unique_name_in_owner = true
 z_index = 20
 layout_mode = 0
-offset_right = 220.0
-offset_bottom = 80.0
