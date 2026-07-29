@@ -28,6 +28,10 @@ func is_valid_target(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> b
 	return ctx.pathfinding.is_reachable(unit, target_pos)
 
 
+func get_tooltip_body() -> String:
+	return "Move to a reachable tile. Spends remaining movement by path cost (diagonals cost more)."
+
+
 func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> Dictionary:
 	var empty := {
 		"commit": Callable(),

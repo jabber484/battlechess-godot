@@ -239,7 +239,7 @@ func uses_self_target_highlight() -> bool:
 	return not is_charging
 
 
-func get_tooltip_text() -> String:
+func get_tooltip_body() -> String:
 	if is_charging:
 		return (
 			"Fire %s (%d/%d mana, %d/%d ticks). Damage = %d × ticks. Spent mana goes to Used timeout."

@@ -23,6 +23,7 @@ alwaysApply: false
   - `get_selection_prompt()` / `get_post_execute_status(unit)` — status lines
   - `get_attack_log_verb()` / `format_hit_chance_extra(attacker, defender)` — combat log / hover
   - `get_button_label()` — ability bar text
+  - `get_tooltip_title()` / `get_tooltip_meta_lines()` / `get_tooltip_body()` — `AbilityTooltip` panel (title, cost/range chips, description)
   - `get_distance_penalty_per_tile()` / `get_range_metric()` / `is_in_attack_range(from, to)` / `get_range_preview_tiles(unit, ctx)` — attack reach UI + hit chance
   - `uses_self_target_highlight()` — self vs attackable tile styling (default: `activates_on_select()`)
   - `get_costly_target_tiles(unit, ctx)` — MOVE stamina-overspend layer (e.g. Warrior Move)

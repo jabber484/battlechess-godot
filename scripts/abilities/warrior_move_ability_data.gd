@@ -64,6 +64,13 @@ func get_costly_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]
 	return get_stamina_overspend_tiles(unit, ctx)
 
 
+func get_tooltip_body() -> String:
+	return (
+		"Move within remaining range for free. Beyond that, spend %d stamina per overflow tile (up to +%.0f this turn)."
+		% [stamina_per_tile, extra_range]
+	)
+
+
 func is_valid_target(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> bool:
 	if unit == null or ctx == null or ctx.pathfinding == null:
 		return false

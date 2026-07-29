@@ -30,6 +30,10 @@ func get_resource_spend_preview(_unit: Unit) -> Dictionary:
 	return {"lock": 0, "commit": 0, "spend": stamina_cost}
 
 
+func get_tooltip_body() -> String:
+	return "Adjacent melee. Costs %d stamina. Cannot target directional full cover." % stamina_cost
+
+
 func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	for pos in super.get_target_tiles(unit, ctx):

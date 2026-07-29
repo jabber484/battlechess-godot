@@ -149,3 +149,48 @@ func uses_self_target_highlight() -> bool:
 ## MOVE: tiles that cost a resource overspend (e.g. stamina). Empty = all targets are free.
 func get_costly_target_tiles(_unit: Unit, _ctx: AbilityContext) -> Array[Vector2i]:
 	return []
+
+
+## AbilityTooltip panel title.
+func get_tooltip_title() -> String:
+	return display_name
+
+
+## Short meta chips for AbilityTooltip (category, cost slot, resource spend, range).
+func get_tooltip_meta_lines() -> PackedStringArray:
+	var lines: PackedStringArray = PackedStringArray()
+	match category:
+		BattleEnums.AbilityCategory.MOVE:
+			lines.append("Move")
+		BattleEnums.AbilityCategory.ACTION:
+			lines.append("Action")
+		BattleEnums.AbilityCategory.PASSIVE:
+			lines.append("Passive")
+		_:
+			pass
+	match cost_slot:
+		BattleEnums.CostSlot.MOVE:
+			lines.append("Move slot")
+		BattleEnums.CostSlot.ACTION:
+			lines.append("Action slot")
+		BattleEnums.CostSlot.NONE:
+			if category != BattleEnums.AbilityCategory.PASSIVE:
+				lines.append("Free")
+		_:
+			pass
+	var preview := get_resource_spend_preview(null)
+	var lock := int(preview.get("lock", 0))
+	var commit := int(preview.get("commit", 0))
+	var spend := int(preview.get("spend", 0))
+	if lock > 0:
+		lines.append("Lock %d" % lock)
+	if commit > 0:
+		lines.append("Commit %d" % commit)
+	if spend > 0:
+		lines.append("Spend %d" % spend)
+	return lines
+
+
+## AbilityTooltip body description. Subclasses should override.
+func get_tooltip_body() -> String:
+	return ""

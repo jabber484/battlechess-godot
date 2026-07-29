@@ -16,3 +16,7 @@ func _init() -> void:
 	attack_range = 1
 	range_metric = BattleEnums.RangeMetric.CHEBYSHEV
 	distance_penalty_per_tile = 0
+
+
+func get_tooltip_body() -> String:
+	return "Adjacent melee attack."

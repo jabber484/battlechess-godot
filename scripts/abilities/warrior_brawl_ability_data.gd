@@ -34,6 +34,13 @@ func on_turn_started(_unit: Unit) -> void:
 	used_this_turn = false
 
 
+func get_tooltip_body() -> String:
+	return (
+		"Free action (once per turn). Costs %d stamina. Enemy strikes first, then you hit if still able."
+		% stamina_cost
+	)
+
+
 func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> Dictionary:
 	var empty := {
 		"commit": Callable(),

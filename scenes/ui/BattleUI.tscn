@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/battle_ui.gd" id="1_ui"]
+[ext_resource type="PackedScene" path="res://scenes/ui/AbilityTooltip.tscn" id="2_tooltip"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_log"]
 bg_color = Color(0.08, 0.1, 0.14, 0.82)
@@ -155,3 +156,10 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_constants/separation = 8
 alignment = 1
+
+[node name="AbilityTooltip" parent="Root" instance=ExtResource("2_tooltip")]
+unique_name_in_owner = true
+z_index = 20
+layout_mode = 0
+offset_right = 220.0
+offset_bottom = 80.0

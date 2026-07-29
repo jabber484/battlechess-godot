@@ -99,7 +99,5 @@ func build_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> D
 	}
 
 
-func get_tooltip_text() -> String:
-	return (
-		"Restore half your max mana, purge all charged spells, then end your turn."
-	)
+func get_tooltip_body() -> String:
+	return "Restore half your max mana, purge all charged spells, then end your turn."

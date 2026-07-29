@@ -29,3 +29,7 @@ func on_incoming_damage(unit: Unit, context) -> void:
 	if not unit.spend_resource(soak, BattleEnums.UnitResource.STAMINA):
 		return
 	context.final_damage = final_damage - soak
+
+
+func get_tooltip_body() -> String:
+	return "Passive: spend stamina 1:1 to soak incoming HP damage."

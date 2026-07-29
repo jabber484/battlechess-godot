@@ -21,3 +21,7 @@ func on_turn_started(unit: Unit) -> void:
 	if unit == null or recharge_amount <= 0:
 		return
 	unit.gain_resource(recharge_amount, BattleEnums.UnitResource.STAMINA)
+
+
+func get_tooltip_body() -> String:
+	return "Passive: restore %d stamina at the start of your turn." % recharge_amount

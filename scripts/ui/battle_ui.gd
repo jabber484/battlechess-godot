@@ -18,6 +18,7 @@ signal ability_unhovered(ability: AbilityData)
 @onready var ability_bar: HBoxContainer = %AbilityBar
 @onready var log_label: RichTextLabel = %LogLabel
 @onready var log_scroll: ScrollContainer = %LogScroll
+@onready var ability_tooltip: AbilityTooltip = %AbilityTooltip
 
 const MAX_LOG_LINES := 50
 
@@ -30,6 +31,8 @@ func _ready() -> void:
 	hit_chance_label.text = ""
 	status_label.text = ""
 	log_label.text = ""
+	if ability_tooltip:
+		ability_tooltip.hide_tooltip()
 
 
 func set_round(round_number: int) -> void:
@@ -141,6 +144,8 @@ func set_end_turn_enabled(enabled: bool) -> void:
 
 
 func clear_abilities() -> void:
+	if ability_tooltip:
+		ability_tooltip.hide_tooltip()
 	_ability_buttons.clear()
 	for child in ability_bar.get_children():
 		child.queue_free()
@@ -163,10 +168,8 @@ func set_abilities(
 		button.disabled = false
 		button.modulate = Color.WHITE if can_use else Color(0.55, 0.55, 0.58, 0.9)
 		button.set_meta("can_use", can_use)
-		if ability.has_method("get_tooltip_text"):
-			button.tooltip_text = str(ability.get_tooltip_text())
 		button.pressed.connect(_on_ability_button_pressed.bind(ability))
-		button.mouse_entered.connect(_on_ability_button_hovered.bind(ability))
+		button.mouse_entered.connect(_on_ability_button_hovered.bind(ability, button))
 		button.mouse_exited.connect(_on_ability_button_unhovered.bind(ability))
 		ability_bar.add_child(button)
 		_ability_buttons[ability] = button
@@ -202,9 +205,13 @@ func _on_ability_button_pressed(ability: AbilityData) -> void:
 	ability_selected.emit(ability)
 
 
-func _on_ability_button_hovered(ability: AbilityData) -> void:
+func _on_ability_button_hovered(ability: AbilityData, button: Button) -> void:
+	if ability_tooltip and is_instance_valid(button):
+		ability_tooltip.show_for(ability, button.get_global_rect())
 	ability_hovered.emit(ability)
 
 
 func _on_ability_button_unhovered(ability: AbilityData) -> void:
+	if ability_tooltip:
+		ability_tooltip.hide_tooltip()
 	ability_unhovered.emit(ability)

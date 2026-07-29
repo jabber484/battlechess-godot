@@ -161,7 +161,7 @@ func get_button_label() -> String:
 	return "Mana Shield"
 
 
-func get_tooltip_text() -> String:
+func get_tooltip_body() -> String:
 	if is_charging:
 		return (
 			"Ward open (%d Charging). Blocks one hit or expires on your next turn → Used."

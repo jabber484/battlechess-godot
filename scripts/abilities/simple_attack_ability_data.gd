@@ -56,6 +56,19 @@ func get_range_preview_tiles(unit: Unit, _ctx: AbilityContext) -> Array[Vector2i
 	return result
 
 
+func get_tooltip_meta_lines() -> PackedStringArray:
+	var lines := super.get_tooltip_meta_lines()
+	var metric_name := "Chebyshev"
+	if range_metric == BattleEnums.RangeMetric.EUCLIDEAN:
+		metric_name = "Euclidean"
+	lines.append("Range %d (%s)" % [attack_range, metric_name])
+	return lines
+
+
+func get_tooltip_body() -> String:
+	return "Ranged attack. Hit chance falls off with distance."
+
+
 func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	if unit == null or ctx == null or ctx.battle_state == null:

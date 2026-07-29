@@ -134,7 +134,7 @@ func get_post_execute_status(_unit: Unit) -> String:
 	return ""
 
 
-func get_tooltip_text() -> String:
+func get_tooltip_body() -> String:
 	return (
 		"Spend %d stamina and end your turn. Fully block the next adjacent hit, "
 		+ "then strike back if the attacker is still adjacent."
