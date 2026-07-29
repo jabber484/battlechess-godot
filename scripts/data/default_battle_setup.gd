@@ -121,7 +121,7 @@ static func _make_warlock_stats() -> UnitStatsData:
 	stats.damage = 8
 	stats.max_hp = 75
 	stats.resource_id = BattleEnums.UnitResource.MANA
-	stats.max_resource = 50
+	stats.max_resource = 5
 	var abilities: Array[AbilityData] = []
 	abilities.append(SimpleMoveAbilityDataScript.new())
 	abilities.append(WarlockChargedBoltAbilityDataScript.new())

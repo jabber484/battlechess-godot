@@ -97,10 +97,10 @@ Standard abilities:
 - Warrior Counter: `WarriorCounterAbilityData` (`id = &"warrior_counter"`) — ACTION; spend stamina, end turn; fully block next hit from an adjacent attacker; riposte if still adjacent; farther hits do not consume it; clears unused on own turn start
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
-- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — lock Available→Charging on open/sip (self-click + range ring); fire commits Charging→Used (`EUCLIDEAN` range 4); cost 10/tick; max 2 ticks → 2× `base_bolt_damage` (10)
-- Warlock Charged Blast: `WarlockChargedBlastAbilityData` (`id = &"warlock_charged_blast"`) — same channel flow; `CHEBYSHEV` range 2; cost 15/tick; base damage 18
-- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — free (`NONE`); lock on open; 1 block or own-turn expire → Charging→Used
-- Warlock mana turn start (`Unit`, `resource_id == MANA`): regen Available into free capacity (Used still blocks) → ability hooks; **turn end** releases up to **10** Used
+- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — lock Available→Charging on open/sip (self-click + range ring); fire commits Charging→Used (`EUCLIDEAN` range 4); `first_tick_lock = 0`, `next_tick_lock = 1`; max 2 ticks → 2× `base_bolt_damage` (10); snap fire commits 0 Used
+- Warlock Charged Blast: `WarlockChargedBlastAbilityData` (`id = &"warlock_charged_blast"`) — same channel flow; `CHEBYSHEV` range 2; `first_tick_lock = 2`, `next_tick_lock = 1`; base damage 18
+- Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — free (`NONE`); lock 2 on open; 1 block or own-turn expire → Charging→Used
+- Warlock mana turn start (`Unit`, `resource_id == MANA`): regen Available into free capacity (Used still blocks) → ability hooks; **turn end** releases up to **1** Used
 - `CostSlot.NONE`: free abilities (no movement/action budget); `can_activate` still requires owning the turn
 - `CostSlot.MOVE`: gated by `unit.can_move_more()` (remaining movement ≥ one cardinal step); complete via `notify_moved(unit, path_cost)`. Warrior Move may also activate on stamina extension when free move is exhausted
 - `CombatSystem.commit_attack(..., require_action, require_own_turn, damage_override, hit_chance_override, range_metric)`: pass `require_action=false` for free-action swings; both false for interrupt retaliation; overrides for ability-scaled damage / flat miss; always pass the ability’s `range_metric`

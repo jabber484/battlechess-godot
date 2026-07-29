@@ -35,7 +35,7 @@ var current_resource: int = 0
 var resource_charging: int = 0
 var resource_used: int = 0
 ## How much Used mana clears each turn end (mana kits).
-const MANA_USED_RELEASE_PER_TURN: int = 10
+const MANA_USED_RELEASE_PER_TURN: int = 1
 var movement_remaining: float = 4.0
 var actions_used: int = 0
 var death_processed: bool = false

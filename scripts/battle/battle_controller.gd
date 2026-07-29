@@ -292,7 +292,7 @@ func _update_resource_spend_preview(unit: Unit, ability: AbilityData) -> void:
 		if bolt.is_charging:
 			commit = bolt.charged_mana
 		else:
-			lock = bolt.charge_draw_amount
+			lock = bolt.open_lock_amount()
 	elif ability is WarlockManaShieldAbilityData:
 		var shield := ability as WarlockManaShieldAbilityData
 		if not shield.is_charging:

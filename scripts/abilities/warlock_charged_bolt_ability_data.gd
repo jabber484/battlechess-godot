@@ -3,16 +3,20 @@ extends SimpleAttackAbilityData
 
 ## Charged Bolt — mid-range channel; locks Available→Charging, fires Charging→Used.
 ##
-## Open (free): select ability → range ring → click self. `lock_resource(charge_draw_amount)`.
+## Open (free slot): select ability → range ring → click self. Locks `first_tick_lock` (0 = free snap).
 ## Fire (ACTION): while charging, click an enemy. Commit charge to Used; clear channel.
-## Turn start (after unit regen+release): sip another tick if under cap.
-## Damage: `floor(base_bolt_damage * ticks)` — two ticks = double first-tick damage.
+## Turn start (after unit regen): sip locks `next_tick_lock` if under cap (Bolt default 1).
+## Damage: `base_bolt_damage * charge_ticks` — two ticks = double first-tick damage.
 
-@export var charge_draw_amount: int = 10
+@export var first_tick_lock: int = 0
+@export var next_tick_lock: int = 1
 @export var max_charge_ticks: int = 2
 @export var base_bolt_damage: int = 10
 
+## Mana locked into this channel (sum of tick locks so far).
 var charged_mana: int = 0
+## Ticks accumulated on this channel (1 after open, up to max_charge_ticks).
+var _charge_ticks: int = 0
 var is_charging: bool = false
 
 
@@ -26,14 +30,25 @@ func _init() -> void:
 	distance_penalty_per_tile = 5
 
 
+func tick_lock_cost(tick_index: int) -> int:
+	if tick_index <= 1:
+		return maxi(0, first_tick_lock)
+	return maxi(0, next_tick_lock)
+
+
 func max_charged_mana() -> int:
-	return charge_draw_amount * max_charge_ticks
+	var total := 0
+	for tick in range(1, max_charge_ticks + 1):
+		total += tick_lock_cost(tick)
+	return total
 
 
 func charge_ticks() -> int:
-	if charge_draw_amount <= 0:
-		return 0
-	return int(float(charged_mana) / float(charge_draw_amount))
+	return _charge_ticks
+
+
+func open_lock_amount() -> int:
+	return tick_lock_cost(1)
 
 
 func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
@@ -44,12 +59,13 @@ func can_activate(unit: Unit, ctx: AbilityContext) -> bool:
 	if is_charging:
 		if not unit.can_act_more():
 			return false
-		if charged_mana < charge_draw_amount:
+		if _charge_ticks < 1:
 			return false
 		return not get_target_tiles(unit, ctx).is_empty()
 	if not unit.has_resource(BattleEnums.UnitResource.MANA):
 		return false
-	return unit.get_resource(BattleEnums.UnitResource.MANA) >= charge_draw_amount
+	var open_cost := open_lock_amount()
+	return open_cost <= 0 or unit.get_resource(BattleEnums.UnitResource.MANA) >= open_cost
 
 
 func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
@@ -70,13 +86,15 @@ func is_valid_target(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> b
 func try_open_channel(unit: Unit) -> bool:
 	if is_charging or unit == null:
 		return false
-	if charge_draw_amount <= 0:
+	if max_charge_ticks < 1:
 		return false
-	if charged_mana + charge_draw_amount > max_charged_mana():
+	var cost := tick_lock_cost(1)
+	if cost > 0 and not unit.lock_resource(cost, BattleEnums.UnitResource.MANA):
 		return false
-	if not unit.lock_resource(charge_draw_amount, BattleEnums.UnitResource.MANA):
+	elif cost <= 0 and not unit.has_resource(BattleEnums.UnitResource.MANA):
 		return false
-	charged_mana += charge_draw_amount
+	charged_mana = cost
+	_charge_ticks = 1
 	is_charging = true
 	return true
 
@@ -84,13 +102,16 @@ func try_open_channel(unit: Unit) -> bool:
 func try_turn_sip(unit: Unit) -> bool:
 	if not is_charging or unit == null:
 		return false
-	if charged_mana >= max_charged_mana():
+	if _charge_ticks >= max_charge_ticks:
 		return false
-	if charge_draw_amount <= 0:
+	var next_tick := _charge_ticks + 1
+	var cost := tick_lock_cost(next_tick)
+	if cost > 0 and not unit.lock_resource(cost, BattleEnums.UnitResource.MANA):
 		return false
-	if not unit.lock_resource(charge_draw_amount, BattleEnums.UnitResource.MANA):
+	elif cost <= 0 and not unit.has_resource(BattleEnums.UnitResource.MANA):
 		return false
-	charged_mana += charge_draw_amount
+	charged_mana += cost
+	_charge_ticks = next_tick
 	return true
 
 
@@ -99,6 +120,7 @@ func spend_charge(unit: Unit) -> int:
 	if spent > 0 and unit:
 		unit.commit_resource_to_used(spent, BattleEnums.UnitResource.MANA)
 	charged_mana = 0
+	_charge_ticks = 0
 	is_charging = false
 	return spent
 
@@ -107,6 +129,7 @@ func purge_channel(unit: Unit = null) -> void:
 	if charged_mana > 0 and unit:
 		unit.commit_resource_to_used(charged_mana, BattleEnums.UnitResource.MANA)
 	charged_mana = 0
+	_charge_ticks = 0
 	is_charging = false
 
 
@@ -129,7 +152,7 @@ func _build_open_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext
 	}
 	if unit == null or not is_valid_target(unit, target_pos, ctx):
 		return empty
-	var amount := charge_draw_amount
+	var amount := open_lock_amount()
 	return {
 		"commit": func() -> bool:
 			return try_open_channel(unit),
@@ -137,8 +160,15 @@ func _build_open_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext
 		"complete": func() -> void:
 			if unit:
 				unit.emit_ability_log(
-					"%s channels %s (%d/%d)"
-					% [unit.display_name, display_name, charged_mana, max_charged_mana()]
+					"%s channels %s (%d/%d mana, %d/%d ticks)"
+					% [
+						unit.display_name,
+						display_name,
+						charged_mana,
+						max_charged_mana(),
+						_charge_ticks,
+						max_charge_ticks,
+					]
 				),
 		"death_units": [],
 		"presentation": BattleEnums.Presentation.SELF_BUFF,
@@ -156,13 +186,12 @@ func _build_fire_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext
 	var prior_commit: Callable = execution.get("commit", Callable())
 
 	execution["commit"] = func() -> bool:
-		if charged_mana < charge_draw_amount:
+		if not is_charging or _charge_ticks < 1:
 			return false
+		var ticks_at_fire := _charge_ticks
 		var spent: int = spend_charge(unit)
 		spent_holder["spent"] = spent
-		spent_holder["ticks"] = (
-			int(float(spent) / float(charge_draw_amount)) if charge_draw_amount > 0 else 0
-		)
+		spent_holder["ticks"] = ticks_at_fire
 		if prior_commit.is_valid():
 			prior_commit.call()
 		return true
@@ -179,10 +208,17 @@ func _build_fire_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext
 func get_tooltip_text() -> String:
 	if is_charging:
 		return (
-			"Fire %s (%d/%d). Damage = %d × ticks. Spent mana goes to Used timeout."
-			% [display_name, charged_mana, max_charged_mana(), base_bolt_damage]
+			"Fire %s (%d/%d mana, %d/%d ticks). Damage = %d × ticks. Spent mana goes to Used timeout."
+			% [
+				display_name,
+				charged_mana,
+				max_charged_mana(),
+				_charge_ticks,
+				max_charge_ticks,
+				base_bolt_damage,
+			]
 		)
 	return (
-		"Open channel: click self (shows range). Locks %d Available→Charging. Cap %d ticks for %d× damage."
-		% [charge_draw_amount, max_charge_ticks, max_charge_ticks]
+		"Open channel: click self (shows range). First tick locks %d, sip locks %d. Cap %d ticks for %d× damage."
+		% [first_tick_lock, next_tick_lock, max_charge_ticks, max_charge_ticks]
 	)

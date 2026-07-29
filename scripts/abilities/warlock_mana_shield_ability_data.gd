@@ -7,9 +7,9 @@ extends AbilityData
 ## Open: lock `charge_draw_amount`; `blocks_available = 1`.
 ## Own turn start (after Available regen): if still open, expire → commit Charging to Used.
 ## Block: full nullify → commit Charging to Used → end channel.
-## Used clears on turn end (up to 10 per turn; hole fills on later regen).
+## Used clears on turn end (up to 1 per turn; hole fills on later regen).
 
-@export var charge_draw_amount: int = 15
+@export var charge_draw_amount: int = 2
 
 var charged_mana: int = 0
 var is_charging: bool = false
