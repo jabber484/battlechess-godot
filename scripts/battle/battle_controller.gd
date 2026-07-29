@@ -165,11 +165,8 @@ func _on_unit_ability_log(unit: Unit, message: String) -> void:
 
 func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int, hit_chance: int) -> void:
 	var verb := "shoots"
-	if (
-		_selected_ability != null
-		and _selected_ability is WarlockChargedAttackAbilityData
-	):
-		verb = "blasts"
+	if _selected_ability != null:
+		verb = _selected_ability.get_attack_log_verb()
 	var msg := "%s %s %s (%d%%): " % [attacker.display_name, verb, defender.display_name, hit_chance]
 	if hit:
 		if damage > 0:
@@ -239,24 +236,7 @@ func _on_ability_selected(ability: AbilityData) -> void:
 	battle_ui.set_selected_ability(_selected_ability)
 	_clear_resource_spend_preview()
 	_refresh_highlights()
-	match ability.category:
-		BattleEnums.AbilityCategory.MOVE:
-			battle_ui.set_status("Selected %s — click a highlighted tile" % ability.display_name)
-		BattleEnums.AbilityCategory.ACTION:
-			if ability is WarlockChargedAttackAbilityData:
-				var channel := ability as WarlockChargedAttackAbilityData
-				if channel.is_charging:
-					battle_ui.set_status(
-						"Selected %s — click an enemy in range" % channel.display_name
-					)
-				else:
-					battle_ui.set_status(
-						"Selected %s — click self to channel (range shown)" % channel.display_name
-					)
-			else:
-				battle_ui.set_status("Selected %s — click a target" % ability.display_name)
-		_:
-			battle_ui.set_status("Selected %s" % ability.display_name)
+	battle_ui.set_status(ability.get_selection_prompt())
 
 
 func _on_ability_hovered(ability: AbilityData) -> void:
@@ -284,26 +264,12 @@ func _update_resource_spend_preview(unit: Unit, ability: AbilityData) -> void:
 	var hud: UnitHUD = unit.get_unit_hud()
 	if hud == null:
 		return
-	var lock := 0
-	var commit := 0
-	var spend := 0
-	if ability is WarlockChargedAttackAbilityData:
-		var channel := ability as WarlockChargedAttackAbilityData
-		if channel.is_charging:
-			commit = channel.charged_mana
-		else:
-			lock = channel.open_lock_amount()
-	elif ability is WarlockManaShieldAbilityData:
-		var shield := ability as WarlockManaShieldAbilityData
-		if not shield.is_charging:
-			lock = shield.charge_draw_amount
-	elif ability is WarriorBasicAttackAbilityData:
-		spend = (ability as WarriorBasicAttackAbilityData).stamina_cost
-	elif ability is WarriorBrawlAbilityData:
-		spend = (ability as WarriorBrawlAbilityData).stamina_cost
-	elif ability is WarriorCounterAbilityData:
-		spend = (ability as WarriorCounterAbilityData).stamina_cost
-	hud.set_resource_spend_preview(lock, commit, spend)
+	var preview := ability.get_resource_spend_preview(unit) if ability else {}
+	hud.set_resource_spend_preview(
+		int(preview.get("lock", 0)),
+		int(preview.get("commit", 0)),
+		int(preview.get("spend", 0)),
+	)
 
 
 func _clear_resource_spend_preview() -> void:
@@ -424,27 +390,9 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 	if unit.is_player() and not battle_state.is_over():
 		if turn_manager.active_unit != unit:
 			return
-		if ability is WarlockChargedAttackAbilityData:
-			var channel := ability as WarlockChargedAttackAbilityData
-			if channel and channel.is_charging:
-				battle_ui.set_status(
-					"%s charged %d/%d — fire at an enemy or End Turn"
-					% [channel.display_name, channel.charged_mana, channel.max_charged_mana()]
-				)
-			else:
-				battle_ui.set_status("Select an ability, or End Turn")
-		elif ability.id == &"warlock_mana_shield":
-			var shield := unit.get_mana_shield()
-			if shield and shield.is_shield_up():
-				battle_ui.set_status("%s raised" % shield.get_shield_status_text())
-			else:
-				battle_ui.set_status("Select an ability, or End Turn")
-		elif ability.id == &"warrior_counter":
-			var counter = unit.get_warrior_counter()
-			if counter and counter.is_counter_up():
-				battle_ui.set_status("Counter ready — turn ended")
-			else:
-				battle_ui.set_status("Select an ability, or End Turn")
+		var status := ability.get_post_execute_status(unit)
+		if not status.is_empty():
+			battle_ui.set_status(status)
 		elif _selected_ability:
 			battle_ui.set_status("Selected %s — choose a target" % _selected_ability.display_name)
 		else:
@@ -533,23 +481,19 @@ func _refresh_highlights() -> void:
 		BattleEnums.AbilityCategory.MOVE:
 			battle_ui.set_hit_chance("")
 			var move_tiles := ability.get_target_tiles(active, _ability_ctx)
-			if ability is WarriorMoveAbilityData:
-				var warrior_move := ability as WarriorMoveAbilityData
-				var stamina_tiles: Array[Vector2i] = warrior_move.get_stamina_overspend_tiles(
-					active, _ability_ctx
-				)
-				var stamina_set: Dictionary = {}
-				for pos in stamina_tiles:
-					stamina_set[pos] = true
+			var costly_tiles := ability.get_costly_target_tiles(active, _ability_ctx)
+			if not costly_tiles.is_empty():
+				var costly_set: Dictionary = {}
+				for pos in costly_tiles:
+					costly_set[pos] = true
 				var free_tiles: Array[Vector2i] = []
 				for pos in move_tiles:
-					if stamina_set.has(pos):
+					if costly_set.has(pos):
 						continue
 					free_tiles.append(pos)
 				if not free_tiles.is_empty():
 					grid_view.show_reachable(free_tiles)
-				if not stamina_tiles.is_empty():
-					grid_view.show_stamina_reachable(stamina_tiles)
+				grid_view.show_stamina_reachable(costly_tiles)
 			elif not move_tiles.is_empty():
 				grid_view.show_reachable(move_tiles)
 			if ability == _selected_ability:
@@ -563,48 +507,18 @@ func _refresh_highlights() -> void:
 
 
 func _show_action_ability_highlights(unit: Unit, ability: AbilityData) -> void:
-	if ability is WarlockChargedAttackAbilityData:
-		var channel := ability as WarlockChargedAttackAbilityData
-		var channel_range := _attack_range_tiles(unit, ability)
-		if not channel_range.is_empty():
-			grid_view.show_range(channel_range)
-		if not channel.is_charging:
-			grid_view.show_self_target(ability.get_target_tiles(unit, _ability_ctx))
-			battle_ui.set_hit_chance("")
-			return
-		var channel_targets := ability.get_target_tiles(unit, _ability_ctx)
-		if not channel_targets.is_empty():
-			grid_view.show_attackable(channel_targets)
-		if channel_targets.is_empty() and channel_range.is_empty():
-			battle_ui.set_hit_chance("")
-		return
-	if ability.activates_on_select() or ability.id == &"warlock_mana_shield":
-		grid_view.show_self_target(ability.get_target_tiles(unit, _ability_ctx))
-		battle_ui.set_hit_chance("")
-		return
-	var range_tiles := _attack_range_tiles(unit, ability)
+	var range_tiles := ability.get_range_preview_tiles(unit, _ability_ctx)
 	if not range_tiles.is_empty():
 		grid_view.show_range(range_tiles)
 	var target_tiles := ability.get_target_tiles(unit, _ability_ctx)
+	if ability.uses_self_target_highlight():
+		grid_view.show_self_target(target_tiles)
+		battle_ui.set_hit_chance("")
+		return
 	if not target_tiles.is_empty():
 		grid_view.show_attackable(target_tiles)
 	if target_tiles.is_empty() and range_tiles.is_empty():
 		battle_ui.set_hit_chance("")
-
-
-func _attack_range_tiles(unit: Unit, ability: AbilityData) -> Array[Vector2i]:
-	var result: Array[Vector2i] = []
-	if unit == null or not (ability is SimpleAttackAbilityData):
-		return result
-	var attack := ability as SimpleAttackAbilityData
-	for x in GridMath.GRID_SIZE:
-		for y in GridMath.GRID_SIZE:
-			var pos := Vector2i(x, y)
-			if pos == unit.grid_pos:
-				continue
-			if attack.is_in_attack_range(unit.grid_pos, pos):
-				result.append(pos)
-	return result
 
 
 func _refresh_attack_hover_preview(unit: Unit) -> void:
@@ -631,14 +545,10 @@ func _refresh_attack_hover_preview(unit: Unit) -> void:
 
 func _hit_chance_text(attacker: Unit, defender: Unit, ability: AbilityData) -> String:
 	var breakdown := combat_system.explain_hit_chance(
-		attacker, defender, _distance_penalty_per_tile(ability), _range_metric(ability)
+		attacker, defender, ability.get_distance_penalty_per_tile(), ability.get_range_metric()
 	)
 	var text := combat_system.format_hit_chance(breakdown)
-	if ability is WarlockChargedAttackAbilityData:
-		var channel: WarlockChargedAttackAbilityData = ability as WarlockChargedAttackAbilityData
-		var ticks: int = channel.charge_ticks()
-		var preview: int = channel.base_damage * maxi(1, ticks)
-		text += " | dmg ~%d (%d×)" % [preview, maxi(1, ticks)]
+	text += ability.format_hit_chance_extra(attacker, defender)
 	return text
 
 
@@ -680,15 +590,3 @@ func _log_color_for(unit: Unit) -> Color:
 	if unit.is_player():
 		return Color(0.55, 0.78, 1.0)
 	return Color(1.0, 0.55, 0.55)
-
-
-func _distance_penalty_per_tile(ability: AbilityData) -> int:
-	if ability is SimpleAttackAbilityData:
-		return (ability as SimpleAttackAbilityData).distance_penalty_per_tile
-	return 0
-
-
-func _range_metric(ability: AbilityData) -> BattleEnums.RangeMetric:
-	if ability is SimpleAttackAbilityData:
-		return (ability as SimpleAttackAbilityData).range_metric
-	return BattleEnums.RangeMetric.CHEBYSHEV

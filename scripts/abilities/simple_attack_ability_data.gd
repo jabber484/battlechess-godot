@@ -34,6 +34,28 @@ func is_in_attack_range(from_pos: Vector2i, to_pos: Vector2i) -> bool:
 	return GridMath.is_within_range(from_pos, to_pos, float(attack_range), range_metric)
 
 
+func get_distance_penalty_per_tile() -> int:
+	return distance_penalty_per_tile
+
+
+func get_range_metric() -> BattleEnums.RangeMetric:
+	return range_metric
+
+
+func get_range_preview_tiles(unit: Unit, _ctx: AbilityContext) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	if unit == null:
+		return result
+	for x in GridMath.GRID_SIZE:
+		for y in GridMath.GRID_SIZE:
+			var pos := Vector2i(x, y)
+			if pos == unit.grid_pos:
+				continue
+			if is_in_attack_range(unit.grid_pos, pos):
+				result.append(pos)
+	return result
+
+
 func get_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	if unit == null or ctx == null or ctx.battle_state == null:

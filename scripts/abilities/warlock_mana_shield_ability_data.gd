@@ -143,6 +143,24 @@ func get_shield_status_text() -> String:
 	return "SHIELD—"
 
 
+func get_resource_spend_preview(_unit: Unit) -> Dictionary:
+	if not is_charging:
+		return {"lock": charge_draw_amount, "commit": 0, "spend": 0}
+	return {"lock": 0, "commit": 0, "spend": 0}
+
+
+func get_post_execute_status(_unit: Unit) -> String:
+	if is_shield_up():
+		return "%s raised" % get_shield_status_text()
+	return ""
+
+
+func get_button_label() -> String:
+	if is_charging:
+		return "Shield" if blocks_available > 0 else "Shield—"
+	return "Mana Shield"
+
+
 func get_tooltip_text() -> String:
 	if is_charging:
 		return (

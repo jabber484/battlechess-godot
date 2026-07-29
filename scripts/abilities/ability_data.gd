@@ -54,7 +54,7 @@ func build_execution(
 
 
 ## Damage hook: mutate DamageContext before HP is applied.
-## Dispatched to all abilities (PASSIVE soak kits, and ACTION abilities with raised state).
+## Dispatched to all abilities (PASSIVE soak kits, and ACTION abilities with raised block state).
 func on_incoming_damage(_unit: Unit, _context) -> void:
 	pass
 
@@ -80,3 +80,72 @@ func on_turn_started(_unit: Unit) -> void:
 ## Called on this owner when a *different* unit's turn begins (e.g. duration countdowns).
 func on_foreign_turn_started(_owner: Unit, _starting_unit: Unit) -> void:
 	pass
+
+
+# --- Optional UI / targeting hooks (BattleController / BattleUI) ---
+
+
+## HUD resource ghost: keys `lock`, `commit`, `spend` (amounts ≥ 0).
+func get_resource_spend_preview(_unit: Unit) -> Dictionary:
+	return {"lock": 0, "commit": 0, "spend": 0}
+
+
+## Status line after the player selects this ability (before targeting confirm).
+func get_selection_prompt() -> String:
+	match category:
+		BattleEnums.AbilityCategory.MOVE:
+			return "Selected %s — click a highlighted tile" % display_name
+		BattleEnums.AbilityCategory.ACTION:
+			return "Selected %s — click a target" % display_name
+		_:
+			return "Selected %s" % display_name
+
+
+## Status after a successful execute. Empty → controller uses a generic fallback.
+func get_post_execute_status(_unit: Unit) -> String:
+	return ""
+
+
+## Verb in the attack-resolved log ("shoots", "blasts", …).
+func get_attack_log_verb() -> String:
+	return "shoots"
+
+
+## Extra text appended to the hit-chance hover line (e.g. charged damage preview).
+func format_hit_chance_extra(_attacker: Unit, _defender: Unit) -> String:
+	return ""
+
+
+## Ability bar button label (may include charge state).
+func get_button_label() -> String:
+	return display_name
+
+
+## Distance falloff per tile for hit chance. Attacks override.
+func get_distance_penalty_per_tile() -> int:
+	return 0
+
+
+## Reach metric for hit chance / range checks. Attacks override.
+func get_range_metric() -> BattleEnums.RangeMetric:
+	return BattleEnums.RangeMetric.CHEBYSHEV
+
+
+## True if `to_pos` is within this ability's attack reach from `from_pos`.
+func is_in_attack_range(_from_pos: Vector2i, _to_pos: Vector2i) -> bool:
+	return false
+
+
+## Full attack-range ring for UI (not only occupied enemy tiles).
+func get_range_preview_tiles(_unit: Unit, _ctx: AbilityContext) -> Array[Vector2i]:
+	return []
+
+
+## If true, style `get_target_tiles` as self-target instead of attackable.
+func uses_self_target_highlight() -> bool:
+	return activates_on_select()
+
+
+## MOVE: tiles that cost a resource overspend (e.g. stamina). Empty = all targets are free.
+func get_costly_target_tiles(_unit: Unit, _ctx: AbilityContext) -> Array[Vector2i]:
+	return []

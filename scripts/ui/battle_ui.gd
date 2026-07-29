@@ -156,17 +156,7 @@ func set_abilities(
 		if ability == null:
 			continue
 		var button := Button.new()
-		button.text = ability.display_name
-		if ability is WarlockChargedAttackAbilityData:
-			var channel: WarlockChargedAttackAbilityData = ability as WarlockChargedAttackAbilityData
-			var short := "Blast" if ability.id == &"warlock_charged_blast" else "Bolt"
-			button.text = "%s (%d/%d)" % [short, channel.charged_mana, channel.max_charged_mana()]
-		elif ability is WarlockManaShieldAbilityData:
-			var shield: WarlockManaShieldAbilityData = ability as WarlockManaShieldAbilityData
-			if shield.is_charging:
-				button.text = "Shield" if shield.blocks_available > 0 else "Shield—"
-			else:
-				button.text = "Mana Shield"
+		button.text = ability.get_button_label()
 		button.custom_minimum_size = Vector2(120, 36)
 		var can_use := bool(is_activatable.call(ability))
 		# Keep mouse events for range preview even when the ability can't be used yet.

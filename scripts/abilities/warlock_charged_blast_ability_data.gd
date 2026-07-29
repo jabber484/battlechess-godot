@@ -8,6 +8,7 @@ extends WarlockChargedAttackAbilityData
 func _init() -> void:
 	id = &"warlock_charged_blast"
 	display_name = "Charged Blast"
+	button_short_name = "Blast"
 	category = BattleEnums.AbilityCategory.ACTION
 	cost_slot = BattleEnums.CostSlot.ACTION
 	attack_range = 2

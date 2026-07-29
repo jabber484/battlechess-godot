@@ -18,6 +18,14 @@ alwaysApply: false
 - Fields: `id` (`StringName`), `display_name`, `category` (`MOVE` | `ACTION` | `PASSIVE`), `cost_slot` (`MOVE` → `notify_moved` with path cost / remaining movement points, `ACTION` → `notify_acted`, `NONE` for passives)
 - Methods: `can_activate(unit, ctx)`, `get_target_tiles(unit, ctx)`, `is_valid_target(unit, target_pos, ctx)`, `build_execution(unit, target_pos, ctx) -> Dictionary` (`commit` / `present` / `complete` / `death_units`)
 - Optional: `activates_on_select()` — if true, ability bar click runs immediately on self (no tile confirm); used by Warlock Mana Shield
+- Optional UI / targeting hooks (override instead of branching in `BattleController` / `BattleUI`):
+  - `get_resource_spend_preview(unit)` → `{lock, commit, spend}` for HUD ghost
+  - `get_selection_prompt()` / `get_post_execute_status(unit)` — status lines
+  - `get_attack_log_verb()` / `format_hit_chance_extra(attacker, defender)` — combat log / hover
+  - `get_button_label()` — ability bar text
+  - `get_distance_penalty_per_tile()` / `get_range_metric()` / `is_in_attack_range(from, to)` / `get_range_preview_tiles(unit, ctx)` — attack reach UI + hit chance
+  - `uses_self_target_highlight()` — self vs attackable tile styling (default: `activates_on_select()`)
+  - `get_costly_target_tiles(unit, ctx)` — MOVE stamina-overspend layer (e.g. Warrior Move)
 - Passives: `can_activate` is always false; implement `on_incoming_damage(unit, context)` and/or `on_turn_started(unit)` when needed. `Unit.modify_incoming_damage` dispatches `on_incoming_damage` to **all** abilities (PASSIVE soak kits and ACTION abilities with raised block state). `Unit.notify_turn_started` dispatches `on_turn_started` to **all** abilities. `Unit.notify_foreign_turn_started` dispatches `on_foreign_turn_started` when a different unit’s turn begins (duration countdowns).
 - Use `AbilityContext` for system refs (`pathfinding`, `grid_system`, `turn_manager`, `battle_state`, `combat_system`). Abilities must not cache Node paths.
 - Execution may include intent for presentation: `presentation` (`BattleEnums.Presentation`), plus `path` / `defender`. Leave `present` empty so `BattlePresenter` fills camera/tweens. Do not reference `CameraRig` from abilities.

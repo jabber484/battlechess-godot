@@ -18,6 +18,8 @@ var charged_mana: int = 0
 ## Ticks accumulated on this channel (1 after open, up to max_charge_ticks).
 var _charge_ticks: int = 0
 var is_charging: bool = false
+## Short ability-bar label (e.g. "Bolt"); empty → `display_name`.
+var button_short_name: String = ""
 
 
 func tick_lock_cost(tick_index: int) -> int:
@@ -195,6 +197,46 @@ func _build_fire_execution(unit: Unit, target_pos: Vector2i, ctx: AbilityContext
 		return int(floor(float(base_damage) * float(maxi(1, ticks))))
 	execution["spent_charge"] = spent_holder
 	return execution
+
+
+func get_resource_spend_preview(_unit: Unit) -> Dictionary:
+	if is_charging:
+		return {"lock": 0, "commit": charged_mana, "spend": 0}
+	return {"lock": open_lock_amount(), "commit": 0, "spend": 0}
+
+
+func get_selection_prompt() -> String:
+	if is_charging:
+		return "Selected %s — click an enemy in range" % display_name
+	return "Selected %s — click self to channel (range shown)" % display_name
+
+
+func get_post_execute_status(_unit: Unit) -> String:
+	if is_charging:
+		return (
+			"%s charged %d/%d — fire at an enemy or End Turn"
+			% [display_name, charged_mana, max_charged_mana()]
+		)
+	return ""
+
+
+func get_attack_log_verb() -> String:
+	return "blasts"
+
+
+func format_hit_chance_extra(_attacker: Unit, _defender: Unit) -> String:
+	var ticks: int = charge_ticks()
+	var preview: int = base_damage * maxi(1, ticks)
+	return " | dmg ~%d (%d×)" % [preview, maxi(1, ticks)]
+
+
+func get_button_label() -> String:
+	var short := button_short_name if not button_short_name.is_empty() else display_name
+	return "%s (%d/%d)" % [short, charged_mana, max_charged_mana()]
+
+
+func uses_self_target_highlight() -> bool:
+	return not is_charging
 
 
 func get_tooltip_text() -> String:

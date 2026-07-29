@@ -60,6 +60,10 @@ func get_stamina_overspend_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vecto
 	return result
 
 
+func get_costly_target_tiles(unit: Unit, ctx: AbilityContext) -> Array[Vector2i]:
+	return get_stamina_overspend_tiles(unit, ctx)
+
+
 func is_valid_target(unit: Unit, target_pos: Vector2i, ctx: AbilityContext) -> bool:
 	if unit == null or ctx == null or ctx.pathfinding == null:
 		return false

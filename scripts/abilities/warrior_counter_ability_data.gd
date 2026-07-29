@@ -124,6 +124,16 @@ func get_status_text() -> String:
 	return "COUNTER" if active else ""
 
 
+func get_resource_spend_preview(_unit: Unit) -> Dictionary:
+	return {"lock": 0, "commit": 0, "spend": stamina_cost}
+
+
+func get_post_execute_status(_unit: Unit) -> String:
+	if is_counter_up():
+		return "Counter ready — turn ended"
+	return ""
+
+
 func get_tooltip_text() -> String:
 	return (
 		"Spend %d stamina and end your turn. Fully block the next adjacent hit, "
