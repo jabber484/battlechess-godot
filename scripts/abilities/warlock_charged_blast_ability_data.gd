@@ -1,9 +1,9 @@
 class_name WarlockChargedBlastAbilityData
-extends WarlockChargedBoltAbilityData
+extends WarlockChargedAttackAbilityData
 
-## Charged Blast — short-range channel nuke. Same open/sip/fire flow as Charged Bolt.
-##
-## Range 2 Chebyshev (adjacent ring including diagonals). Open locks 2; sip locks 1.
+## Charged Blast — short-range channel nuke. Open locks 2; sip locks 1.
+## Range 2 Chebyshev. Base damage 18.
+
 
 func _init() -> void:
 	id = &"warlock_charged_blast"
@@ -16,4 +16,4 @@ func _init() -> void:
 	first_tick_lock = 2
 	next_tick_lock = 1
 	max_charge_ticks = 2
-	base_bolt_damage = 18
+	base_damage = 18

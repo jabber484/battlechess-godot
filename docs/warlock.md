@@ -64,8 +64,8 @@ UnitStats
   ├── resource_id = MANA, max_resource = 5
   └── abilities[]
         ├── SimpleMoveAbilityData
-        ├── WarlockChargedBoltAbilityData
-        ├── WarlockChargedBlastAbilityData
+        ├── WarlockChargedBoltAbilityData   # extends WarlockChargedAttackAbilityData
+        ├── WarlockChargedBlastAbilityData  # extends WarlockChargedAttackAbilityData
         └── WarlockManaShieldAbilityData
 ```
 
@@ -73,7 +73,8 @@ UnitStats
 | Layer | Owns |
 | ----- | ---- |
 | `Unit` | Available (`current_resource`), `resource_charging`, `resource_used`; lock / commit / regen / release |
-| Charged Bolt / Blast | Per-spell `charged_mana` / `_charge_ticks` / `is_charging`; open + sip + fire |
+| `WarlockChargedAttackAbilityData` | Shared open / sip / fire; `charged_mana` / `_charge_ticks` / `is_charging` |
+| Charged Bolt / Blast | Sibling kits (range, locks, `base_damage`) on that base |
 | Mana Shield | `charged_mana`, `is_charging`, `blocks_available`; open; block or own-turn expire → Used |
 | `CombatSystem` | Hit/damage math |
 
@@ -158,7 +159,7 @@ Shared move. Octile path costs. MOVE slot.
 ### Charged Bolt — `warlock_charged_bolt`
 
 Open (free slot): range ring → click **self** → lock **0** (tick 1).  
-Fire (ACTION): click enemy → commit charge to Used; damage `base_bolt_damage × ticks` (1 or 2).  
+Fire (ACTION): click enemy → commit charge to Used; damage `base_damage × ticks` (1 or 2).  
 Turn sip: second tick if under cap (+**1**).  
 Range **4** Euclidean. Base damage **10**.  
 Exports: `first_tick_lock = 0`, `next_tick_lock = 1`.
@@ -167,7 +168,7 @@ Exports: `first_tick_lock = 0`, `next_tick_lock = 1`.
 
 Same channel flow as Bolt (own charge bank).  
 Open lock **2**; sip +**1** to second tick (cap **3** mana).  
-Fire: damage `18 × ticks` (1 or 2).  
+Fire: damage `base_damage × ticks` (18 × 1 or 2).  
 Range **2** Chebyshev (short-range blast). Exports: `first_tick_lock = 2`, `next_tick_lock = 1`.
 
 ### Mana Shield — `warlock_mana_shield`
@@ -199,6 +200,7 @@ Typical loop: move → open Bolt (snap or hold for sip) and/or Shield → fire �
 | ------- | -------- |
 | Spawn / kit | `default_battle_setup.gd` |
 | Partitions | `unit.gd` |
+| Charged-attack base | `warlock_charged_attack_ability_data.gd` |
 | Bolt / Blast / Shield | `warlock_*_ability_data.gd` |
 | HUD / battle UI | `unit_hud.gd`, `battle_ui.gd` |
 | Conventions | `.cursor/rules/abilities.mdc` |
@@ -218,8 +220,8 @@ Typical loop: move → open Bolt (snap or hold for sip) and/or Shield → fire �
 | Blast `first_tick_lock` / `next_tick_lock` | 2 / 1 |
 | Shield `charge_draw_amount` | 2 |
 | `max_charge_ticks` | 2 |
-| Bolt `base_bolt_damage` | 10 |
-| Blast `base_bolt_damage` | 18 |
+| Bolt `base_damage` | 10 |
+| Blast `base_damage` | 18 |
 
 
 ---

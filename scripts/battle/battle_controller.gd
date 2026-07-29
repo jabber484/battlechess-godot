@@ -167,7 +167,7 @@ func _on_attack_resolved(attacker: Unit, defender: Unit, hit: bool, damage: int,
 	var verb := "shoots"
 	if (
 		_selected_ability != null
-		and _selected_ability is WarlockChargedBoltAbilityData
+		and _selected_ability is WarlockChargedAttackAbilityData
 	):
 		verb = "blasts"
 	var msg := "%s %s %s (%d%%): " % [attacker.display_name, verb, defender.display_name, hit_chance]
@@ -243,15 +243,15 @@ func _on_ability_selected(ability: AbilityData) -> void:
 		BattleEnums.AbilityCategory.MOVE:
 			battle_ui.set_status("Selected %s — click a highlighted tile" % ability.display_name)
 		BattleEnums.AbilityCategory.ACTION:
-			if ability is WarlockChargedBoltAbilityData:
-				var bolt := ability as WarlockChargedBoltAbilityData
-				if bolt.is_charging:
+			if ability is WarlockChargedAttackAbilityData:
+				var channel := ability as WarlockChargedAttackAbilityData
+				if channel.is_charging:
 					battle_ui.set_status(
-						"Selected %s — click an enemy in range" % bolt.display_name
+						"Selected %s — click an enemy in range" % channel.display_name
 					)
 				else:
 					battle_ui.set_status(
-						"Selected %s — click self to channel (range shown)" % bolt.display_name
+						"Selected %s — click self to channel (range shown)" % channel.display_name
 					)
 			else:
 				battle_ui.set_status("Selected %s — click a target" % ability.display_name)
@@ -287,12 +287,12 @@ func _update_resource_spend_preview(unit: Unit, ability: AbilityData) -> void:
 	var lock := 0
 	var commit := 0
 	var spend := 0
-	if ability is WarlockChargedBoltAbilityData:
-		var bolt := ability as WarlockChargedBoltAbilityData
-		if bolt.is_charging:
-			commit = bolt.charged_mana
+	if ability is WarlockChargedAttackAbilityData:
+		var channel := ability as WarlockChargedAttackAbilityData
+		if channel.is_charging:
+			commit = channel.charged_mana
 		else:
-			lock = bolt.open_lock_amount()
+			lock = channel.open_lock_amount()
 	elif ability is WarlockManaShieldAbilityData:
 		var shield := ability as WarlockManaShieldAbilityData
 		if not shield.is_charging:
@@ -424,12 +424,12 @@ func _execute_ability(ability: AbilityData, unit: Unit, target_pos: Vector2i) ->
 	if unit.is_player() and not battle_state.is_over():
 		if turn_manager.active_unit != unit:
 			return
-		if ability is WarlockChargedBoltAbilityData:
-			var bolt := ability as WarlockChargedBoltAbilityData
-			if bolt and bolt.is_charging:
+		if ability is WarlockChargedAttackAbilityData:
+			var channel := ability as WarlockChargedAttackAbilityData
+			if channel and channel.is_charging:
 				battle_ui.set_status(
 					"%s charged %d/%d — fire at an enemy or End Turn"
-					% [bolt.display_name, bolt.charged_mana, bolt.max_charged_mana()]
+					% [channel.display_name, channel.charged_mana, channel.max_charged_mana()]
 				)
 			else:
 				battle_ui.set_status("Select an ability, or End Turn")
@@ -563,19 +563,19 @@ func _refresh_highlights() -> void:
 
 
 func _show_action_ability_highlights(unit: Unit, ability: AbilityData) -> void:
-	if ability is WarlockChargedBoltAbilityData:
-		var bolt := ability as WarlockChargedBoltAbilityData
-		var bolt_range := _attack_range_tiles(unit, ability)
-		if not bolt_range.is_empty():
-			grid_view.show_range(bolt_range)
-		if not bolt.is_charging:
+	if ability is WarlockChargedAttackAbilityData:
+		var channel := ability as WarlockChargedAttackAbilityData
+		var channel_range := _attack_range_tiles(unit, ability)
+		if not channel_range.is_empty():
+			grid_view.show_range(channel_range)
+		if not channel.is_charging:
 			grid_view.show_self_target(ability.get_target_tiles(unit, _ability_ctx))
 			battle_ui.set_hit_chance("")
 			return
-		var bolt_targets := ability.get_target_tiles(unit, _ability_ctx)
-		if not bolt_targets.is_empty():
-			grid_view.show_attackable(bolt_targets)
-		if bolt_targets.is_empty() and bolt_range.is_empty():
+		var channel_targets := ability.get_target_tiles(unit, _ability_ctx)
+		if not channel_targets.is_empty():
+			grid_view.show_attackable(channel_targets)
+		if channel_targets.is_empty() and channel_range.is_empty():
 			battle_ui.set_hit_chance("")
 		return
 	if ability.activates_on_select() or ability.id == &"warlock_mana_shield":
@@ -634,10 +634,10 @@ func _hit_chance_text(attacker: Unit, defender: Unit, ability: AbilityData) -> S
 		attacker, defender, _distance_penalty_per_tile(ability), _range_metric(ability)
 	)
 	var text := combat_system.format_hit_chance(breakdown)
-	if ability is WarlockChargedBoltAbilityData:
-		var bolt: WarlockChargedBoltAbilityData = ability as WarlockChargedBoltAbilityData
-		var ticks: int = bolt.charge_ticks()
-		var preview: int = bolt.base_bolt_damage * maxi(1, ticks)
+	if ability is WarlockChargedAttackAbilityData:
+		var channel: WarlockChargedAttackAbilityData = ability as WarlockChargedAttackAbilityData
+		var ticks: int = channel.charge_ticks()
+		var preview: int = channel.base_damage * maxi(1, ticks)
 		text += " | dmg ~%d (%d×)" % [preview, maxi(1, ticks)]
 	return text
 

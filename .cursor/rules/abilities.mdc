@@ -97,8 +97,9 @@ Standard abilities:
 - Warrior Counter: `WarriorCounterAbilityData` (`id = &"warrior_counter"`) — ACTION; spend stamina, end turn; fully block next hit from an adjacent attacker; riposte if still adjacent; farther hits do not consume it; clears unused on own turn start
 - Warrior shield: `WarriorStaminaShieldAbilityData` (`id = &"warrior_stamina_shield"`) — passive soaks HP damage with stamina
 - Warrior recharge: `WarriorStaminaRechargeAbilityData` (`id = &"warrior_stamina_recharge"`) — passive restores stamina on turn start
-- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — lock Available→Charging on open/sip (self-click + range ring); fire commits Charging→Used (`EUCLIDEAN` range 4); `first_tick_lock = 0`, `next_tick_lock = 1`; max 2 ticks → 2× `base_bolt_damage` (10); snap fire commits 0 Used
-- Warlock Charged Blast: `WarlockChargedBlastAbilityData` (`id = &"warlock_charged_blast"`) — same channel flow; `CHEBYSHEV` range 2; `first_tick_lock = 2`, `next_tick_lock = 1`; base damage 18
+- Warlock charged attack base: `WarlockChargedAttackAbilityData` — shared open/sip/fire channel (`first_tick_lock` / `next_tick_lock` / `base_damage`); Bolt and Blast are siblings on this base (not Bolt←Blast)
+- Warlock Charged Bolt: `WarlockChargedBoltAbilityData` (`id = &"warlock_charged_bolt"`) — lock Available→Charging on open/sip (self-click + range ring); fire commits Charging→Used (`EUCLIDEAN` range 4); `first_tick_lock = 0`, `next_tick_lock = 1`; max 2 ticks → 2× `base_damage` (10); snap fire commits 0 Used
+- Warlock Charged Blast: `WarlockChargedBlastAbilityData` (`id = &"warlock_charged_blast"`) — same channel flow; `CHEBYSHEV` range 2; `first_tick_lock = 2`, `next_tick_lock = 1`; `base_damage` 18
 - Warlock Mana Shield: `WarlockManaShieldAbilityData` (`id = &"warlock_mana_shield"`) — free (`NONE`); lock 2 on open; 1 block or own-turn expire → Charging→Used
 - Warlock mana turn start (`Unit`, `resource_id == MANA`): regen Available into free capacity (Used still blocks) → ability hooks; **turn end** releases up to **1** Used
 - `CostSlot.NONE`: free abilities (no movement/action budget); `can_activate` still requires owning the turn

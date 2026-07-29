@@ -157,10 +157,10 @@ func set_abilities(
 			continue
 		var button := Button.new()
 		button.text = ability.display_name
-		if ability is WarlockChargedBoltAbilityData:
-			var bolt: WarlockChargedBoltAbilityData = ability as WarlockChargedBoltAbilityData
+		if ability is WarlockChargedAttackAbilityData:
+			var channel: WarlockChargedAttackAbilityData = ability as WarlockChargedAttackAbilityData
 			var short := "Blast" if ability.id == &"warlock_charged_blast" else "Bolt"
-			button.text = "%s (%d/%d)" % [short, bolt.charged_mana, bolt.max_charged_mana()]
+			button.text = "%s (%d/%d)" % [short, channel.charged_mana, channel.max_charged_mana()]
 		elif ability is WarlockManaShieldAbilityData:
 			var shield: WarlockManaShieldAbilityData = ability as WarlockManaShieldAbilityData
 			if shield.is_charging:
